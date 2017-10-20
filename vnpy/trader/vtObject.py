@@ -4,7 +4,7 @@ import time
 
 from vnpy.trader.vtConstant import (EMPTY_STRING, EMPTY_UNICODE, 
                                     EMPTY_FLOAT, EMPTY_INT)
-from sqlalchemy import FLOAT, Column, Integer, String
+from sqlalchemy import FLOAT, Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -121,8 +121,9 @@ class VtTradeData(VtBaseData, Base):
     direction = Column(String(32))  # 成交方向
     offset = Column(String(32))  # 成交开平仓
     price = Column(FLOAT(10, 4))  # 成交价格
-    volume = Column(String(32))  # 成交数量
+    volume = Column(Integer)  # 成交数量
     tradeTime = Column(String(32))  # 成交时间
+    dt = Column(DateTime)  # 成交时间
     #----------------------------------------------------------------------
     def __init__(self):
         """Constructor"""
@@ -145,9 +146,7 @@ class VtTradeData(VtBaseData, Base):
         self.price = EMPTY_FLOAT                # 成交价格
         self.volume = EMPTY_INT                 # 成交数量
         self.tradeTime = EMPTY_STRING           # 成交时间
-
-
-
+        self.dt = None                  # 成交时间
 
 ########################################################################
 class VtOrderData(VtBaseData):

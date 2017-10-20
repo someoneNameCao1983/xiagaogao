@@ -392,7 +392,7 @@ def loadMcCsv(fileName, dbName, symbol):
 
         flt = {'datetime': bar.datetime}
         collection.update_one(flt, {'$set':bar.__dict__}, upsert=True)  
-        print bar.date, bar.time
+        #print bar.date, bar.time
     
     print u'插入完毕，耗时：%s' % (time()-start)
 

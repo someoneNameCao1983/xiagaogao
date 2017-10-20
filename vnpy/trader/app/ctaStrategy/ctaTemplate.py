@@ -84,7 +84,7 @@ class CtaTemplate(object):
     #----------------------------------------------------------------------
     def onTrade(self, trade):
         """收到成交推送（必须由用户继承实现）"""
-        self.ctaEngine.savePosition(self)
+        #self.ctaEngine.savePosition(self)
         raise NotImplementedError
     
     #----------------------------------------------------------------------
@@ -208,6 +208,7 @@ class TargetPosTemplate(CtaTemplate):
     lastTick = None         # 最新tick数据
     lastBar = None          # 最新bar数据
     targetPos = EMPTY_INT   # 目标持仓
+
     orderList = []          # 委托号列表
 
     # 变量列表，保存了变量的名称
