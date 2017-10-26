@@ -116,4 +116,4 @@ if __name__ == '__main__':
     runChildProcess()
     
     # 尽管同样实现了无人值守，但强烈建议每天启动时人工检查，为自己的PNL负责
-    # runParentProcess()
+    #runParentProcess()

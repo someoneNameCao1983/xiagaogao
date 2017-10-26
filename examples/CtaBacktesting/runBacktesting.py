@@ -31,12 +31,13 @@ if __name__ == '__main__':
     # 设置使用的历史数据库
     engine.setDatabase(MINUTE_DB_NAME, 'IF0000')
     
-    # 在引擎中创建策略对象
-    d = {'atrLength': 11}
+    # 在引擎中创建策略对象 artLengt是atr测率的参数,vtSymbol是策略模板的参数，只支持单和约测率
+    d = {'atrLength': 11, 'vtSymbol': 'IF'}
     engine.initStrategy(AtrRsiStrategy, d)
-    
+
     # 开始跑回测
     engine.runBacktesting()
     
     # 显示回测结果
     #engine.showBacktestingResult()
+    engine.showDailyResult()
