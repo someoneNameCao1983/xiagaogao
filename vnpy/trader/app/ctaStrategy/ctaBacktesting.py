@@ -948,13 +948,13 @@ class BacktestingEngine(object):
         """显示按日统计的交易结果"""
         if not df:
             df = self.calculateDailyResult()
-        df2 = copy.deepcopy(df)
 
         df['balance'] = df['netPnl'].cumsum() + self.capital
         df['return'] = (np.log(df['balance']) - np.log(df['balance'].shift(1))).fillna(0)
         df['highlevel'] = df['balance'].rolling(min_periods=1,window=len(df),center=False).max()
         df['drawdown'] = df['balance'] - df['highlevel']        
         #to mysql
+        df2 = copy.deepcopy(df)
         del df2['tradeList']
         saveDataFrameToMysql(df2, 'daily_rs')
         saveEntityListToMysql(self.tradeDict)
@@ -1122,9 +1122,11 @@ class DailyResult(object):
                 posChange = int(trade.volume)
             else:
                 posChange = int(trade.volume)*(-1)
-
+            """逐笔成交计算盈亏以结算价"""
             self.tradingPnl += posChange * (self.closePrice - float(trade.price)) * size
-            self.closePosition += posChange
+            """持仓多空"""
+            self.closePosition += posChange逐笔成交计算盈亏
+            """成交金额"""
             self.turnover += float(trade.price) * int(trade.volume) * size
             self.commission += float(trade.price) * int(trade.volume) * size * rate
             self.slippage += int(trade.volume) * size * slippage
