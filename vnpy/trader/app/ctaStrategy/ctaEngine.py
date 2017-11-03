@@ -30,7 +30,7 @@ from vnpy.trader.vtConstant import *
 from vnpy.trader.vtObject import VtTickData, VtBarData
 from vnpy.trader.vtGateway import VtSubscribeReq, VtOrderReq, VtCancelOrderReq, VtLogData
 from vnpy.trader.vtFunction import todayDate, getJsonPath
-
+from vnpy.cty.tools import saveEntityToMysql
 from .ctaBase import *
 from .strategy import STRATEGY_CLASS
 
@@ -156,7 +156,6 @@ class CtaEngine(object):
 
         self.writeCtaLog(u'策略%s发送委托，%s，%s，%s@%s' 
                          %(strategy.name, vtSymbol, req.direction, volume, price))
-        
         return vtOrderID
     
     #----------------------------------------------------------------------
@@ -272,16 +271,20 @@ class CtaEngine(object):
             l = self.tickStrategyDict[tick.vtSymbol]
             for strategy in l:
                 self.callStrategyFunc(strategy, strategy.onTick, tick)
-    
+        tick.highPrice = 0.00
+        tick.lowPrice = 0.00
+        tick.openPrice = 0.00
+
+        saveEntityToMysql(tick)
     #----------------------------------------------------------------------
     def processOrderEvent(self, event):
         """处理委托推送"""
         order = event.dict_['data']
-        
         if order.vtOrderID in self.orderStrategyDict:
             strategy = self.orderStrategyDict[order.vtOrderID]            
             self.callStrategyFunc(strategy, strategy.onOrder, order)
-    
+
+        saveEntityToMysql(order)
     #----------------------------------------------------------------------
     def processTradeEvent(self, event):
         """处理成交推送"""
@@ -311,13 +314,13 @@ class CtaEngine(object):
                 posBuffer = PositionBuffer()
                 posBuffer.vtSymbol = trade.vtSymbol
                 self.posBufferDict[trade.vtSymbol] = posBuffer
-            posBuffer.updateTradeData(trade)            
-            
+            posBuffer.updateTradeData(trade)
+        saveEntityToMysql(trade)
     #----------------------------------------------------------------------
     def processPositionEvent(self, event):
         """处理持仓推送"""
         pos = event.dict_['data']
-        
+
         # 更新持仓缓存数据
         if pos.vtSymbol in self.tickStrategyDict:
             posBuffer = self.posBufferDict.get(pos.vtSymbol, None)

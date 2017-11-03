@@ -14,7 +14,7 @@ def saveDataFrameToMysql(df, tname, clear=True):
     start = time()
     engine = create_engine(globalSetting['mysqlUrl'])
     if clear:
-        df.to_sql(tname, engine,if_exists='replace')
+        df.to_sql(tname, engine, if_exists='replace')
     else:
         df.to_sql(tname, engine, if_exists='append')
     print u'插入完毕，耗时：%s' % (time() - start)
@@ -34,3 +34,11 @@ def saveEntityListToMysql(EntityDict):
             session.commit()
     session.commit()
     print u'插入完毕，耗时：%s' % (time() - start)
+# 插入mysql
+
+def saveEntityToMysql(Entity):
+    engine = create_engine(globalSetting['mysqlUrl'])
+    semake = sessionmaker(bind=engine)
+    session = semake()
+    session.add(Entity)
+    session.commit()

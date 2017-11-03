@@ -11,7 +11,7 @@ from vnpy.trader.app.ctaStrategy.ctaBacktesting import BacktestingEngine, MINUTE
 
 
 if __name__ == '__main__':
-    from vnpy.trader.app.ctaStrategy.strategy.strategyAtrRsi import AtrRsiStrategy
+    from vnpy.trader.app.ctaStrategy.strategy.strategyEmaDemo import EmaDemoStrategy
     
     # 创建回测引擎
     engine = BacktestingEngine()
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     
     # 在引擎中创建策略对象 artLengt是atr测率的参数,vtSymbol是策略模板的参数，只支持单和约测率
     d = {'atrLength': 11, 'vtSymbol': 'IF'}
-    engine.initStrategy(AtrRsiStrategy, d)
+    engine.initStrategy(EmaDemoStrategy, d)
 
     # 开始跑回测
     engine.runBacktesting()

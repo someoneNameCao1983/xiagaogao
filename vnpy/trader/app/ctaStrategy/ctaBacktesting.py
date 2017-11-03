@@ -30,7 +30,7 @@ from vnpy.trader.vtGlobal import globalSetting
 from vnpy.trader.vtObject import VtTickData, VtBarData
 from vnpy.trader.vtConstant import *
 from vnpy.trader.vtGateway import VtOrderData, VtTradeData
-from .ctaBase import *
+from vnpy.trader.app.ctaStrategy.ctaBase import *
 
 ########################################################################
 class BacktestingEngine(object):
@@ -948,15 +948,14 @@ class BacktestingEngine(object):
         """显示按日统计的交易结果"""
         if not df:
             df = self.calculateDailyResult()
-
-        df['balance'] = df['netPnl'].cumsum() + self.capital
-        df['return'] = (np.log(df['balance']) - np.log(df['balance'].shift(1))).fillna(0)
-        df['highlevel'] = df['balance'].rolling(min_periods=1,window=len(df),center=False).max()
-        df['drawdown'] = df['balance'] - df['highlevel']        
-        #to mysql
+        # to mysql
         df2 = copy.deepcopy(df)
         del df2['tradeList']
         saveDataFrameToMysql(df2, 'daily_rs')
+        df['balance'] = df['netPnl'].cumsum() + self.capital
+        #df['return'] = (np.log(df['balance']) - np.log(df['balance'].shift(1))).fillna(0)
+        df['highlevel'] = df['balance'].rolling(min_periods=1,window=len(df),center=False).max()
+        df['drawdown'] = df['balance'] - df['highlevel']
         saveEntityListToMysql(self.tradeDict)
         # 计算统计结果
         startDate = df.index[0]
@@ -985,13 +984,13 @@ class BacktestingEngine(object):
         dailyTradeCount = totalTradeCount / totalDays
         
         totalReturn = (endBalance/self.capital - 1) * 100
-        dailyReturn = df['return'].mean() * 100
-        returnStd = df['return'].std() * 100
-        
-        if returnStd:
-            sharpeRatio = dailyReturn / returnStd * np.sqrt(240)
-        else:
-            sharpeRatio = 0
+       # dailyReturn = df['return'].mean() * 100
+        #returnStd = df['return'].std() * 100
+        #
+        #if returnStd:
+        #    sharpeRatio = dailyReturn / returnStd * np.sqrt(240)
+        #else:
+        #    sharpeRatio = 0
         
         # 输出统计结果
         self.output('-' * 30)
@@ -1020,10 +1019,10 @@ class BacktestingEngine(object):
         self.output(u'日均成交金额：\t%s' % formatNumber(dailyTurnover))
         self.output(u'日均成交笔数：\t%s' % formatNumber(dailyTradeCount))
         
-        self.output(u'日均收益率：\t%s%%' % formatNumber(dailyReturn))
-        self.output(u'收益标准差：\t%s%%' % formatNumber(returnStd))
-        self.output(u'Sharpe Ratio：\t%s' % formatNumber(sharpeRatio))
-        
+        #self.output(u'日均收益率：\t%s%%' % formatNumber(dailyReturn))
+       # self.output(u'收益标准差：\t%s%%' % formatNumber(returnStd))
+        #self.output(u'Sharpe Ratio：\t%s' % formatNumber(sharpeRatio))
+
         # 绘图
         fig = plt.figure(figsize=(10, 16))
         
@@ -1125,7 +1124,7 @@ class DailyResult(object):
             """逐笔成交计算盈亏以结算价"""
             self.tradingPnl += posChange * (self.closePrice - float(trade.price)) * size
             """持仓多空"""
-            self.closePosition += posChange逐笔成交计算盈亏
+            self.closePosition += posChange
             """成交金额"""
             self.turnover += float(trade.price) * int(trade.volume) * size
             self.commission += float(trade.price) * int(trade.volume) * size * rate
