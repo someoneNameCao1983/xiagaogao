@@ -20,6 +20,7 @@ from __future__ import division
 
 import json
 import os
+import math
 import traceback
 from collections import OrderedDict
 from datetime import datetime, timedelta
@@ -285,7 +286,8 @@ class CtaEngine(object):
         if order.vtOrderID in self.orderStrategyDict:
             strategy = self.orderStrategyDict[order.vtOrderID]            
             self.callStrategyFunc(strategy, strategy.onOrder, order)
-
+        if math.isnan(order.price):
+            order.price = -1
         saveEntityToMysql(order,'Simnow')
     #----------------------------------------------------------------------
     def processTradeEvent(self, event):

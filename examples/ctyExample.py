@@ -51,7 +51,6 @@ for row in rs:
 print u'插入完毕，耗时：%s' % (time()-start)
 '''
 '''
-
 class VtTickData(Base):
     """Tick行情数据类"""
     # ----------------------------------------------------------------------
@@ -234,7 +233,7 @@ class VtTradeData(Base):
         self.volume = EMPTY_INT  # 成交数量
         self.tradeTime = EMPTY_STRING  # 成交时间
         self.dt = None  # 成交时间
-engine = create_engine(globalSetting['btiUrl'])
+engine = create_engine(globalSetting['simnowUrl'])
 Session = sessionmaker(bind=engine)
 s = Session()
 trade1 = VtOrderData()
@@ -251,5 +250,4 @@ s.add(trade3)
 #s.add(trade4)
 Base.metadata.create_all(engine)
 s.commit()
-
 '''

@@ -113,10 +113,15 @@ def convert2Mongo(Conract,DbName):
         tick.bidPrice1 = row['bidPrice1']
         tick.askVolume1 = row['askVolume1']
         tick.bidVolume1 = row['bidVolume1']
+        tick.date = row['date']
+        tick.time = row['time']
+        tick.datetime = row['datetime']
+        tick.exchange = 'SHFE'
+        tick.vtSymbol = 'rb1801'
         flt = {'datetime': tick.datetime}
-        tick2 = {"_id": tick.id, "symbol": tick.symbol, "lastPrice": tick.lastPrice, "highPrice": tick.highPrice,
-                 "lowPrice": tick.lowPrice, "datetime": tick.datetime,
-                 "openPrice": tick.openPrice, "askPrice1": tick.askPrice1, "bidPrice1": tick.bidPrice1,
+        tick2 = {"_id": tick.id, "symbol": tick.symbol, "vtSymbol": tick.vtSymbol, "lastPrice": tick.lastPrice, "highPrice": tick.highPrice,
+                 "lowPrice": tick.lowPrice, "datetime": tick.datetime, "exchange": tick.exchange,"date": tick.date,"time": tick.time,
+                 "openPrice": tick.openPrice, "askPrice1": tick.askPrice1, "bidPrice1": tick.bidPrice1,"datetime": tick.datetime,
                  "askVolume1": tick.askVolume1, "bidVolume1": tick.bidVolume1}
         collection.insert_one(tick2)
     print u'插入完毕，耗时：%s' % (time() - start)

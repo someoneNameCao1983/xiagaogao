@@ -19,7 +19,7 @@ if __name__ == '__main__':
     # 设置引擎的回测模式为K线
     engine.setBacktestingMode(engine.TICK_MODE)
 
-    # 设置回测用的数据起始日期
+    # 设置回测用的数据起始日期 tick data no need initDay
     engine.setStartDate('20171101',initDays=0)
     
     # 设置产品相关参数
@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     # 开始跑回测
     engine.runBacktesting()
-    engine.saveTraderDict()
+    engine.saveTradeDict()
     # 显示回测结果
     #engine.showBacktestingResult()
     #engine.showDailyResult()

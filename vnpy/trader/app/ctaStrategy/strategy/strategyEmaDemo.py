@@ -27,7 +27,7 @@ class EmaDemoStrategy(CtaTemplate):
     # 策略参数
     fastK = 0.9     # 快速EMA参数
     slowK = 0.1     # 慢速EMA参数
-    initDays = 0   # 初始化数据所用的天数
+    initDays = 10   # 初始化数据所用的天数
     
     # 策略变量
     bar = None
@@ -165,6 +165,8 @@ class EmaDemoStrategy(CtaTemplate):
             elif self.pos < 0:
                 self.cover(bar.close, 1)
                 self.buy(bar.close, 1)
+            print 'crossBelow  datetime:' + bar.datetime.strftime('%H:%M:%S')
+            print bar.close
         # 死叉和金叉相反
         elif crossBelow:
             if self.pos == 0:
@@ -172,7 +174,8 @@ class EmaDemoStrategy(CtaTemplate):
             elif self.pos > 0:
                 self.sell(bar.close, 1)
                 self.short(bar.close, 1)
-                
+            print 'crossBelow  datetime:' + bar.datetime.strftime('%H:%M:%S')
+            print bar.close
         # 发出状态更新事件
         self.putEvent()
         

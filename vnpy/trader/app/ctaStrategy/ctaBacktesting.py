@@ -267,7 +267,14 @@ class BacktestingEngine(object):
         """新的Tick"""
         self.tick = tick
         self.dt = tick.datetime
-        
+
+        quoteH = self.dt.strftime('%H')
+        quoteMin = self.dt.strftime('%M')
+        quoteS = self.dt.strftime('%S')
+        #print quoteH + ':' + quoteMin
+        if quoteH == '14' and quoteMin == '59':
+            return
+
         self.crossLimitOrder()
         self.crossStopOrder()
         self.strategy.onTick(tick)
@@ -286,6 +293,7 @@ class BacktestingEngine(object):
     #----------------------------------------------------------------------
     def crossLimitOrder(self):
         """基于最新数据撮合限价单"""
+
         # 先确定会撮合成交的价格
         if self.mode == self.BAR_MODE:
             buyCrossPrice = self.bar.low        # 若买入方向限价单价格高于该价格，则会成交
@@ -293,7 +301,6 @@ class BacktestingEngine(object):
             buyBestCrossPrice = self.bar.open   # 在当前时间点前发出的买入委托可能的最优成交价
             sellBestCrossPrice = self.bar.open  # 在当前时间点前发出的卖出委托可能的最优成交价
         else:
-
             buyCrossPrice = self.tick.askPrice1
             sellCrossPrice = self.tick.bidPrice1
             buyBestCrossPrice = self.tick.askPrice1
@@ -553,9 +560,9 @@ class BacktestingEngine(object):
         log = str(self.dt) + ' ' + content 
         self.logList.append(log)
     #----------------------------------------------------------------------
-    def saveTraderDict(self):
+    def saveTradeDict(self):
         """记录日志"""
-        self.output(u'trader record 入库')
+        self.output(u'trade record 入库')
         saveEntityListToMysql(self.tradeDict, 'BTI')
 
     def saveDaliyResultDict(self):
