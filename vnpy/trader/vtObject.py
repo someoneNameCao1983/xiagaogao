@@ -24,7 +24,7 @@ class VtBaseData(object):
 class VtTickData(VtBaseData,Base):
     """Tick行情数据类"""
     # ----------------------------------------------------------------------
-    __tablename__ = 'monitor_tick_data'
+    __tablename__ = 'tick_data'
     id = Column(Integer, primary_key=True, autoincrement=True)
     symbol = Column(String(32))
     exchange = Column(String(32))  # 交易所代码
@@ -37,7 +37,7 @@ class VtTickData(VtBaseData,Base):
     openInterest = Column(Integer)  # 持仓量
     time = Column(String(32))     # 时间 11:20:56.5
     date = Column(String(32))   # 日期 20151009
-    datetime = Column(DateTime)  # python的datetime时间对象
+    datetime = Column(DateTime(3))  # python的datetime时间对象
     # 常规行情
     openPrice = Column(FLOAT(10, 4))  # 今日开盘价
     highPrice = Column(FLOAT(10, 4))  # 今日最高价
@@ -46,6 +46,11 @@ class VtTickData(VtBaseData,Base):
 
     upperLimit = Column(FLOAT(10, 4))  # 涨停价
     lowerLimit = Column(FLOAT(10, 4))  # 跌停价
+
+    bidPrice1 = Column(FLOAT(10, 4))
+    askPrice1 = Column(FLOAT(10, 4))
+    bidVolume1 = Column(Integer)
+    askVolume1 = Column(Integer)
     def __init__(self):
         """Constructor"""
         super(VtTickData, self).__init__()
@@ -129,7 +134,7 @@ class VtBarData(VtBaseData):
 ########################################################################
 class VtTradeData(VtBaseData, Base):
     """成交数据类"""
-    __tablename__ = 'monitor_trade_data'
+    __tablename__ = 'trade_data'
     id = Column(Integer, primary_key=True, autoincrement=True)
     symbol = Column(String(32))
     exchange = Column(String(32))  # 交易所代码
@@ -176,7 +181,7 @@ class VtTradeData(VtBaseData, Base):
 class VtOrderData(VtBaseData,Base):
     """订单数据类"""
     # ----------------------------------------------------------------------
-    __tablename__ = 'monitor_order_data'
+    __tablename__ = 'order_data'
     id = Column(Integer, primary_key=True, autoincrement=True)
     # 代码编号相关
     symbol = Column(String(32))  # 合约代码

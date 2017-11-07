@@ -3,22 +3,59 @@
 # AUTHOR:Tianyang.Cao
 # WeChat/QQ: 54831165
 import tushare as ts
-from sqlalchemy import create_engine
-from vnpy.trader.vtObject import VtTradeData
+from vnpy.cty.tools import *
+from vnpy.trader.vtObject import *
 from vnpy.trader.vtGlobal import globalSetting
-from vnpy.cty.tools import saveDataFrameToMysql
-from sqlalchemy import FLOAT, Column, Integer, String,DateTime
-from sqlalchemy.orm import sessionmaker,relationship
-from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime, timedelta
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import *
+from time import time
+from sqlalchemy import *
+import pymongo
+from vnpy.trader.app.ctaStrategy.ctaBase import *
 from vnpy.trader.vtConstant import (EMPTY_STRING, EMPTY_UNICODE,
                                     EMPTY_FLOAT, EMPTY_INT)
 Base = declarative_base()
+convert2Mongo('rb1801','Simnow')
+'''
+#mysql 连接
+start = time()
 
+engine = create_engine(globalSetting['mysqlUrl'])
+engine.echo = True
+m = MetaData(bind=engine)
+tick = Table('monitor_tick_data', m, autoload=True)
+s = tick.select()
+rs = s.execute()
+
+#mongodb 连接
+client = pymongo.MongoClient(globalSetting['mongoHost'], globalSetting['mongoPort'])
+collection = client[TICK_DB_NAME]['rb1801']
+collection.ensure_index([('_id', pymongo.ASCENDING)], unique=True)
+
+for row in rs:
+    tick = VtTickData()
+    tick.datetime = row['datetime']
+    tick.lastPrice = row['lastPrice']
+    tick.highPrice = row['highPrice']
+    tick.lowPrice = row['lowPrice']
+    tick.openPrice = row['openPrice']
+    tick.askPrice1 = row['lastPrice']
+    tick.bidPrice1 = row['lastPrice']
+    tick.askVolume1 = 0
+    tick.bidVolume1 = 0
+    flt = {'datetime': tick.datetime}
+    tick2 = {"_id":tick.id ,"symbol" :tick.symbol,  "lastPrice" : tick.lastPrice, "highPrice": tick.highPrice, "lowPrice": tick.lowPrice, "datetime": tick.datetime,
+            "openPrice": tick.openPrice,"askPrice1" : tick.askPrice1,"bidPrice1" :tick.bidPrice1,"askVolume1" : tick.askVolume1,"bidVolume1" : tick.bidVolume1}
+    collection.insert_one(tick2)
+print u'插入完毕，耗时：%s' % (time()-start)
+'''
+'''
 
 class VtTickData(Base):
     """Tick行情数据类"""
     # ----------------------------------------------------------------------
-    __tablename__ = 'monitor_tick_data'
+    __tablename__ = 'tick_data'
     id = Column(Integer, primary_key=True, autoincrement=True)
     symbol = Column(String(32))
     exchange = Column(String(32))  # 交易所代码
@@ -40,6 +77,11 @@ class VtTickData(Base):
 
     upperLimit = Column(FLOAT(10, 4))  # 涨停价
     lowerLimit = Column(FLOAT(10, 4))  # 跌停价
+
+    bidPrice1 = Column(FLOAT(10, 4))
+    askPrice1 = Column(FLOAT(10, 4))
+    bidVolume1 = Column(Integer)
+    askVolume1 = Column(Integer)
     def __init__(self):
         """Constructor"""
         super(VtTickData, self).__init__()
@@ -95,7 +137,7 @@ class VtTickData(Base):
 class VtOrderData(Base):
     """订单数据类"""
     # ----------------------------------------------------------------------
-    __tablename__ = 'monitor_order_data'
+    __tablename__ = 'order_data'
     id = Column(Integer, primary_key=True, autoincrement=True)
     # 代码编号相关
     symbol = Column(String(32))  # 合约代码
@@ -149,7 +191,7 @@ class VtOrderData(Base):
 
 class VtTradeData(Base):
     """成交数据类"""
-    __tablename__ = 'monitor_trade_data'
+    __tablename__ = 'trade_data'
     id = Column(Integer, primary_key=True, autoincrement=True)
     symbol = Column(String(32))
     exchange = Column(String(32))  # 交易所代码
@@ -192,39 +234,8 @@ class VtTradeData(Base):
         self.volume = EMPTY_INT  # 成交数量
         self.tradeTime = EMPTY_STRING  # 成交时间
         self.dt = None  # 成交时间
-
-class StopOrder(Base):
-    """本地停止单"""
-    # ----------------------------------------------------------------------
-    __tablename__ = 'monitor_stop_order'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    vtSymbol = Column(String(32))
-    orderType = Column(String(32))
-    direction = Column(String(32))
-    offset = Column(String(32))
-    price = Column(FLOAT(10, 4))
-    volume = Column(Integer)
-
-    strategy =  Column(String(32))  # 下停止单的策略对象
-    stopOrderID = Column(String(32))  # 停止单的本地编号
-    status = Column(String(32))  # 停止单状态
-    def __init__(self):
-        """Constructor"""
-        self.vtSymbol = EMPTY_STRING
-        self.orderType = EMPTY_UNICODE
-        self.direction = EMPTY_UNICODE
-        self.offset = EMPTY_UNICODE
-        self.price = EMPTY_FLOAT
-        self.volume = EMPTY_INT
-
-        self.strategy = None  # 下停止单的策略对象
-        self.stopOrderID = EMPTY_STRING  # 停止单的本地编号
-        self.status = EMPTY_STRING  # 停止单状态
-    #df = ts.get_tick_data('600848', date='2017-09-26')
-#saveDataFrameToMysql(df, 'tick_data')
-engine = create_engine(globalSetting['mysqlUrl'])
+engine = create_engine(globalSetting['btiUrl'])
 Session = sessionmaker(bind=engine)
-Base.metadata.create_all(engine)
 s = Session()
 trade1 = VtOrderData()
 trade1.symbol = 'IF1803'
@@ -237,5 +248,8 @@ trade4.vtSymbol = 'IF1803'
 s.add(trade1)
 s.add(trade2)
 s.add(trade3)
-s.add(trade4)
+#s.add(trade4)
+Base.metadata.create_all(engine)
 s.commit()
+
+'''

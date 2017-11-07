@@ -7,7 +7,7 @@
 from __future__ import division
 
 
-from vnpy.trader.app.ctaStrategy.ctaBacktesting import BacktestingEngine, MINUTE_DB_NAME
+from vnpy.trader.app.ctaStrategy.ctaBacktesting import BacktestingEngine, MINUTE_DB_NAME,TICK_DB_NAME
 
 
 if __name__ == '__main__':
@@ -17,27 +17,27 @@ if __name__ == '__main__':
     engine = BacktestingEngine()
     
     # 设置引擎的回测模式为K线
-    engine.setBacktestingMode(engine.BAR_MODE)
+    engine.setBacktestingMode(engine.TICK_MODE)
 
     # 设置回测用的数据起始日期
-    engine.setStartDate('20120101')
+    engine.setStartDate('20171101',initDays=0)
     
     # 设置产品相关参数
     engine.setSlippage(0.2)     # 股指1跳
     engine.setRate(0.3/10000)   # 万0.3
-    engine.setSize(300)         # 股指合约大小 
-    engine.setPriceTick(0.2)    # 股指最小价格变动
+    engine.setSize(10)         # 股指合约大小
+    engine.setPriceTick(0.1)    # 股指最小价格变动
     
     # 设置使用的历史数据库
-    engine.setDatabase(MINUTE_DB_NAME, 'IF0000')
+    engine.setDatabase(TICK_DB_NAME, 'rb1801')
     
     # 在引擎中创建策略对象 artLengt是atr测率的参数,vtSymbol是策略模板的参数，只支持单和约测率
-    d = {'atrLength': 11, 'vtSymbol': 'IF'}
+    d = { 'vtSymbol': 'rb1801'}
     engine.initStrategy(EmaDemoStrategy, d)
 
     # 开始跑回测
     engine.runBacktesting()
-    
+    engine.saveTraderDict()
     # 显示回测结果
     #engine.showBacktestingResult()
-    engine.showDailyResult()
+    #engine.showDailyResult()

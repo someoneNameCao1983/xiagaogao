@@ -27,7 +27,7 @@ class EmaDemoStrategy(CtaTemplate):
     # 策略参数
     fastK = 0.9     # 快速EMA参数
     slowK = 0.1     # 慢速EMA参数
-    initDays = 10   # 初始化数据所用的天数
+    initDays = 0   # 初始化数据所用的天数
     
     # 策略变量
     bar = None
@@ -74,11 +74,11 @@ class EmaDemoStrategy(CtaTemplate):
     def onInit(self):
         """初始化策略（必须由用户继承实现）"""
         self.writeCtaLog(u'双EMA演示策略初始化')
-        
+
         initData = self.loadBar(self.initDays)
         for bar in initData:
             self.onBar(bar)
-        
+
         self.putEvent()
         
     #----------------------------------------------------------------------
@@ -103,14 +103,14 @@ class EmaDemoStrategy(CtaTemplate):
             if self.bar:
                 self.onBar(self.bar)
             
-            bar = VtBarData()              
+            bar = VtBarData()
             bar.vtSymbol = tick.vtSymbol
             bar.symbol = tick.symbol
             bar.exchange = tick.exchange
             
-            bar.open = tick.lastPrice
-            bar.high = tick.lastPrice
-            bar.low = tick.lastPrice
+            bar.open = tick.openPrice
+            bar.high = tick.highPrice
+            bar.low = tick.lowPrice
             bar.close = tick.lastPrice
             
             bar.date = tick.date

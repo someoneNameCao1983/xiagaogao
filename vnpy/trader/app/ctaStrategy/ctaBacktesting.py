@@ -198,7 +198,7 @@ class BacktestingEngine(object):
 
         # 载入初始化需要用的数据
         flt = {'datetime':{'$gte':self.dataStartDate,
-                           '$lt':self.strategyStartDate}}        
+                           '$lt':self.strategyStartDate}}
         initCursor = collection.find(flt).sort('datetime')
         
         # 将数据从查询指针中读取出，并生成列表
@@ -230,7 +230,7 @@ class BacktestingEngine(object):
             func = self.newBar
         else:
             dataClass = VtTickData
-            func = self.newTic
+            func = self.newTick
 
         self.output(u'开始回测')
         
@@ -293,11 +293,17 @@ class BacktestingEngine(object):
             buyBestCrossPrice = self.bar.open   # 在当前时间点前发出的买入委托可能的最优成交价
             sellBestCrossPrice = self.bar.open  # 在当前时间点前发出的卖出委托可能的最优成交价
         else:
+
             buyCrossPrice = self.tick.askPrice1
             sellCrossPrice = self.tick.bidPrice1
             buyBestCrossPrice = self.tick.askPrice1
             sellBestCrossPrice = self.tick.bidPrice1
-        
+            '''
+            buyCrossPrice = self.tick.lastPrice
+            sellCrossPrice = self.tick.lastPrice
+            buyBestCrossPrice = self.tick.lastPrice
+            sellBestCrossPrice = self.tick.lastPrice
+            '''
         # 遍历限价单字典中的所有限价单
         for orderID, order in self.workingLimitOrderDict.items():
             # 推送委托进入队列（未成交）的状态更新
@@ -546,8 +552,15 @@ class BacktestingEngine(object):
         """记录日志"""
         log = str(self.dt) + ' ' + content 
         self.logList.append(log)
-        
+    #----------------------------------------------------------------------
+    def saveTraderDict(self):
+        """记录日志"""
+        self.output(u'trader record 入库')
+        saveEntityListToMysql(self.tradeDict, 'BTI')
 
+    def saveDaliyResultDict(self):
+        """记录日志"""
+        self.output(u'daliy record 入库')
     #------------------------------------------------
     # 结果计算相关
     #------------------------------------------------      
@@ -949,14 +962,14 @@ class BacktestingEngine(object):
         if not df:
             df = self.calculateDailyResult()
         # to mysql
-        df2 = copy.deepcopy(df)
-        del df2['tradeList']
-        saveDataFrameToMysql(df2, 'daily_rs')
+        #df2 = copy.deepcopy(df)
+        #del df2['tradeList']
+        #saveDataFrameToMysql(df2, 'daily_rs')
         df['balance'] = df['netPnl'].cumsum() + self.capital
-        #df['return'] = (np.log(df['balance']) - np.log(df['balance'].shift(1))).fillna(0)
+        df['return'] = (np.log(df['balance']) - np.log(df['balance'].shift(1))).fillna(0)
         df['highlevel'] = df['balance'].rolling(min_periods=1,window=len(df),center=False).max()
         df['drawdown'] = df['balance'] - df['highlevel']
-        saveEntityListToMysql(self.tradeDict)
+
         # 计算统计结果
         startDate = df.index[0]
         endDate = df.index[-1]

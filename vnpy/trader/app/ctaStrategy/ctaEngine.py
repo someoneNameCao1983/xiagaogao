@@ -271,11 +271,13 @@ class CtaEngine(object):
             l = self.tickStrategyDict[tick.vtSymbol]
             for strategy in l:
                 self.callStrategyFunc(strategy, strategy.onTick, tick)
+        '''
         tick.highPrice = 0.00
         tick.lowPrice = 0.00
         tick.openPrice = 0.00
+        '''
 
-        saveEntityToMysql(tick)
+        saveEntityToMysql(tick, 'Simnow')
     #----------------------------------------------------------------------
     def processOrderEvent(self, event):
         """处理委托推送"""
@@ -284,7 +286,7 @@ class CtaEngine(object):
             strategy = self.orderStrategyDict[order.vtOrderID]            
             self.callStrategyFunc(strategy, strategy.onOrder, order)
 
-        saveEntityToMysql(order)
+        saveEntityToMysql(order,'Simnow')
     #----------------------------------------------------------------------
     def processTradeEvent(self, event):
         """处理成交推送"""
@@ -315,7 +317,7 @@ class CtaEngine(object):
                 posBuffer.vtSymbol = trade.vtSymbol
                 self.posBufferDict[trade.vtSymbol] = posBuffer
             posBuffer.updateTradeData(trade)
-        saveEntityToMysql(trade)
+        saveEntityToMysql(trade,'Simnow')
     #----------------------------------------------------------------------
     def processPositionEvent(self, event):
         """处理持仓推送"""

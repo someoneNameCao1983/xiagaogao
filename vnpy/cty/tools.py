@@ -3,12 +3,19 @@
 # AUTHOR:Tianyang.Cao
 # WeChat/QQ: 54831165
 
-from sqlalchemy import create_engine
+from sqlalchemy import *
+from vnpy.trader.vtObject import *
 from vnpy.trader.vtGlobal import globalSetting
 from sqlalchemy.orm import sessionmaker
 from time import time
+import pymongo
 import copy
+from sqlalchemy.ext.declarative import *
 #
+TICK_DB_NAME = 'VnTrader_Tick_Db'
+DAILY_DB_NAME = 'VnTrader_Daily_Db'
+MINUTE_DB_NAME = 'VnTrader_1Min_Db'
+
 def saveDataFrameToMysql(df, tname, clear=True):
 
     start = time()
@@ -20,9 +27,20 @@ def saveDataFrameToMysql(df, tname, clear=True):
     print u'插入完毕，耗时：%s' % (time() - start)
     
 # 插入mysql
-def saveEntityListToMysql(EntityDict):
+def saveEntityListToMysql(EntityDict,DbName):
     start = time()
-    engine = create_engine(globalSetting['mysqlUrl'])
+    # simnow模拟
+    if DbName == 'Simnow':
+        engine = create_engine(globalSetting['simnow'])
+    # 行情库
+    elif DbName == 'Quote':
+        engine = create_engine(globalSetting['quoteUrl'])
+    # 回测库
+    elif DbName == 'BTI':
+        engine = create_engine(globalSetting['btiUrl'])
+    else:
+        print '没有指定数据'
+        engine = create_engine(globalSetting['mysqlUrl'])
     semake = sessionmaker(bind=engine)
     session = semake()
     tradeCount = 0
@@ -36,9 +54,69 @@ def saveEntityListToMysql(EntityDict):
     print u'插入完毕，耗时：%s' % (time() - start)
 # 插入mysql
 
-def saveEntityToMysql(Entity):
-    engine = create_engine(globalSetting['mysqlUrl'])
+def saveEntityToMysql(Entity,DbName):
+    #simnow模拟
+    if DbName == 'Simnow':
+        engine = create_engine(globalSetting['simnowUrl'])
+    # 行情库
+    elif DbName == 'Quote':
+        engine = create_engine(globalSetting['quoteUrl'])
+    #回测库
+    elif DbName == 'BTI':
+        engine = create_engine(globalSetting['btiUrl'])
+    else:
+        print '没有指定数据'
+        engine = create_engine(globalSetting['mysqlUrl'])
     semake = sessionmaker(bind=engine)
     session = semake()
     session.add(Entity)
     session.commit()
+
+def convert2Mongo(Conract,DbName):
+    start = time()
+    # simnow模拟
+    if DbName == 'Simnow':
+        engine = create_engine(globalSetting['simnowUrl'])
+    # 行情库
+    elif DbName == 'Quote':
+        engine = create_engine(globalSetting['quoteUrl'])
+    # 回测库
+    elif DbName == 'BTI':
+        engine = create_engine(globalSetting['btiUrl'])
+    else:
+        print '没有指定数据'
+        engine = create_engine(globalSetting['mysqlUrl'])
+
+    #engine.echo = True
+    m = MetaData(bind=engine)
+    tick = Table('tick_data', m, autoload=True)
+    s = tick.select()
+    rs = s.execute()
+
+    # mongodb 连接
+    client = pymongo.MongoClient(globalSetting['mongoHost'], globalSetting['mongoPort'])
+    collection = client[TICK_DB_NAME][Conract]
+    collection.drop()
+    collection.ensure_index([('_id', pymongo.ASCENDING)], unique=True)
+
+    for row in rs:
+        tick = VtTickData()
+        tick.id = row['id']
+        tick.exchange = row['exchange']
+        tick.symbol = row['symbol']
+        tick.datetime = row['datetime']
+        tick.lastPrice = row['lastPrice']
+        tick.highPrice = row['highPrice']
+        tick.lowPrice = row['lowPrice']
+        tick.openPrice = row['openPrice']
+        tick.askPrice1 = row['askPrice1']
+        tick.bidPrice1 = row['bidPrice1']
+        tick.askVolume1 = row['askVolume1']
+        tick.bidVolume1 = row['bidVolume1']
+        flt = {'datetime': tick.datetime}
+        tick2 = {"_id": tick.id, "symbol": tick.symbol, "lastPrice": tick.lastPrice, "highPrice": tick.highPrice,
+                 "lowPrice": tick.lowPrice, "datetime": tick.datetime,
+                 "openPrice": tick.openPrice, "askPrice1": tick.askPrice1, "bidPrice1": tick.bidPrice1,
+                 "askVolume1": tick.askVolume1, "bidVolume1": tick.bidVolume1}
+        collection.insert_one(tick2)
+    print u'插入完毕，耗时：%s' % (time() - start)
