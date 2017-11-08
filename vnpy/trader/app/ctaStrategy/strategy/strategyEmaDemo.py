@@ -13,9 +13,10 @@
 
 from __future__ import division
 
-from vnpy.trader.vtObject import VtBarData
+from vnpy.trader.vtObject import VtBarData,KeyTickData
 from vnpy.trader.vtConstant import EMPTY_STRING, EMPTY_FLOAT
 from vnpy.trader.app.ctaStrategy.ctaTemplate import CtaTemplate
+from vnpy.cty.tools import *
 
 
 ########################################################################
@@ -129,6 +130,7 @@ class EmaDemoStrategy(CtaTemplate):
             
             bar.high = max(bar.high, tick.lastPrice)
             bar.low = min(bar.low, tick.lastPrice)
+            bar.datetime = tick.datetime
             bar.close = tick.lastPrice
         
     #----------------------------------------------------------------------
@@ -142,7 +144,7 @@ class EmaDemoStrategy(CtaTemplate):
             self.fastMa1 = self.fastMa0
             self.fastMa0 = bar.close * self.fastK + self.fastMa0 * (1 - self.fastK)
             self.fastMa.append(self.fastMa0)
-            
+
         if not self.slowMa0:
             self.slowMa0 = bar.close
             self.slowMa.append(self.slowMa0)
@@ -165,8 +167,11 @@ class EmaDemoStrategy(CtaTemplate):
             elif self.pos < 0:
                 self.cover(bar.close, 1)
                 self.buy(bar.close, 1)
-            print 'crossBelow  datetime:' + bar.datetime.strftime('%H:%M:%S')
-            print bar.close
+            keyTick = KeyTickData()
+            keyTick.datetime = bar.datetime
+            keyTick.lastPrice = bar.close
+            keyTick.exchange = 'keyQuote'
+            saveEntityToMysql(keyTick, 'BTI')
         # 死叉和金叉相反
         elif crossBelow:
             if self.pos == 0:
@@ -174,8 +179,10 @@ class EmaDemoStrategy(CtaTemplate):
             elif self.pos > 0:
                 self.sell(bar.close, 1)
                 self.short(bar.close, 1)
-            print 'crossBelow  datetime:' + bar.datetime.strftime('%H:%M:%S')
-            print bar.close
+            keyTick = KeyTickData()
+            keyTick.datetime = bar.datetime
+            keyTick.lastPrice = bar.close
+            saveEntityToMysql(keyTick, 'BTI')
         # 发出状态更新事件
         self.putEvent()
         

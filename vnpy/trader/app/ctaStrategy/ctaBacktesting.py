@@ -17,8 +17,7 @@ import pymongo
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from vnpy.cty.tools import saveDataFrameToMysql
-from vnpy.cty.tools import saveEntityListToMysql
+from vnpy.cty.tools import *
 
 # 如果安装了seaborn则设置为白色风格
 try:
@@ -471,12 +470,13 @@ class BacktestingEngine(object):
             order.offset = OFFSET_OPEN
         elif orderType == CTAORDER_COVER:
             order.direction = DIRECTION_LONG
-            order.offset = OFFSET_CLOSE     
-        
+            order.offset = OFFSET_CLOSE
+
         # 保存到限价单字典中
         self.workingLimitOrderDict[orderID] = order
         self.limitOrderDict[orderID] = order
-        
+        order2 = copy.deepcopy(order)
+        saveEntityToMysql(order2, 'BTI')
         return orderID
     
     #----------------------------------------------------------------------
