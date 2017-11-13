@@ -235,6 +235,7 @@ class AtrRsiStrategy(CtaTemplate):
     #----------------------------------------------------------------------
     def onTrade(self, trade):
         # 发出状态更新事件
+        #super.ctaEngine.savePosition(self)
         self.putEvent()
 
     #----------------------------------------------------------------------

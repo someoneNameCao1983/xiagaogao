@@ -16,6 +16,7 @@ from vnpy.trader.vtConstant import (EMPTY_STRING, EMPTY_UNICODE,
 import pymongo
 import pandas as pd
 import numpy as np
+
 import matplotlib.pyplot as plt
 from vnpy.cty.tools import *
 
@@ -94,6 +95,7 @@ class BacktestingEngine(object):
         
         # 日线回测结果计算用
         self.dailyResultDict = OrderedDict()
+        self.resultD = {} #回测结果存放
     
     #------------------------------------------------
     # 通用功能
@@ -475,8 +477,6 @@ class BacktestingEngine(object):
         # 保存到限价单字典中
         self.workingLimitOrderDict[orderID] = order
         self.limitOrderDict[orderID] = order
-        order2 = copy.deepcopy(order)
-        saveEntityToMysql(order2, 'BTI')
         return orderID
     
     #----------------------------------------------------------------------
@@ -560,10 +560,14 @@ class BacktestingEngine(object):
         log = str(self.dt) + ' ' + content 
         self.logList.append(log)
     #----------------------------------------------------------------------
-    def saveTradeDict(self):
+    def saveDictData(self):
         """记录日志"""
-        self.output(u'trade record 入库')
         saveEntityListToMysql(self.tradeDict, 'BTI')
+        self.output(u'trade record 入库')
+        saveEntityListToMysql(self.limitOrderDict, 'BTI')
+        self.output(u'order record 入库')
+
+
 
     def saveDaliyResultDict(self):
         """记录日志"""
@@ -763,32 +767,31 @@ class BacktestingEngine(object):
             profitLossRatio = -averageWinning/averageLosing # 盈亏比
 
         # 返回回测结果
-        d = {}
-        d['capital'] = capital
-        d['maxCapital'] = maxCapital
-        d['drawdown'] = drawdown
-        d['totalResult'] = totalResult
-        d['totalTurnover'] = totalTurnover
-        d['totalCommission'] = totalCommission
-        d['totalSlippage'] = totalSlippage
-        d['timeList'] = timeList
-        d['pnlList'] = pnlList
-        d['capitalList'] = capitalList
-        d['drawdownList'] = drawdownList
-        d['winningRate'] = winningRate
-        d['averageWinning'] = averageWinning
-        d['averageLosing'] = averageLosing
-        d['profitLossRatio'] = profitLossRatio
-        d['posList'] = posList
-        d['tradeTimeList'] = tradeTimeList
-        
-        return d
+        self.resultD = {}
+        self.resultD['capital'] = capital
+        self.resultD['maxCapital'] = maxCapital
+        self.resultD['drawdown'] = drawdown
+        self.resultD['totalResult'] = totalResult
+        self.resultD['totalTurnover'] = totalTurnover
+        self.resultD['totalCommission'] = totalCommission
+        self.resultD['totalSlippage'] = totalSlippage
+        self.resultD['timeList'] = timeList
+        self.resultD['pnlList'] = pnlList
+        self.resultD['capitalList'] = capitalList
+        self.resultD['drawdownList'] = drawdownList
+        self.resultD['winningRate'] = winningRate
+        self.resultD['averageWinning'] = averageWinning
+        self.resultD['averageLosing'] = averageLosing
+        self.resultD['profitLossRatio'] = profitLossRatio
+        self.resultD['posList'] = posList
+        self.resultD['tradeTimeList'] = tradeTimeList
+        #return d
         
     #----------------------------------------------------------------------
     def showBacktestingResult(self):
         """显示回测结果"""
-        d = self.calculateBacktestingResult()
-        
+        d = self.resultD
+
         # 输出
         self.output('-' * 30)
         self.output(u'第一笔交易：\t%s' % d['timeList'][0])
@@ -853,6 +856,12 @@ class BacktestingEngine(object):
         # 清空成交相关
         self.tradeCount = 0
         self.tradeDict.clear()
+        #清空回测记录
+        engine = create_engine(globalSetting['btiUrl'])
+        engine.echo = True
+        engine.execute(text('delete from trade_data'))
+        engine.execute(text('delete from key_tick_data'))
+        engine.execute(text('delete from order_data'))
         
     #----------------------------------------------------------------------
     def runOptimization(self, strategyClass, optimizationSetting):
@@ -956,22 +965,23 @@ class BacktestingEngine(object):
             for k, v in dailyResult.__dict__.items():
                 resultDict[k].append(v)
                 
-        resultDf = pd.DataFrame.from_dict(resultDict)
+        self.resultD = pd.DataFrame.from_dict(resultDict).set_index('date')
         
         # 计算衍生数据
-        resultDf = resultDf.set_index('date')
+        #self.resultD = self.resultD.set_index('date')
 
-        return resultDf
+        #return resultDf
     
     #----------------------------------------------------------------------
     def showDailyResult(self, df=None):
         """显示按日统计的交易结果"""
-        if not df:
-            df = self.calculateDailyResult()
+        #if not df:
+        #    df = self.calculateDailyResult()
         # to mysql
         #df2 = copy.deepcopy(df)
         #del df2['tradeList']
         #saveDataFrameToMysql(df2, 'daily_rs')
+        df = self.resultD
         df['balance'] = df['netPnl'].cumsum() + self.capital
         df['return'] = (np.log(df['balance']) - np.log(df['balance'].shift(1))).fillna(0)
         df['highlevel'] = df['balance'].rolling(min_periods=1,window=len(df),center=False).max()
@@ -1004,13 +1014,13 @@ class BacktestingEngine(object):
         dailyTradeCount = totalTradeCount / totalDays
         
         totalReturn = (endBalance/self.capital - 1) * 100
-       # dailyReturn = df['return'].mean() * 100
-        #returnStd = df['return'].std() * 100
+        dailyReturn = df['return'].mean() * 100
+        returnStd = df['return'].std() * 100
         #
-        #if returnStd:
-        #    sharpeRatio = dailyReturn / returnStd * np.sqrt(240)
-        #else:
-        #    sharpeRatio = 0
+        if returnStd:
+            sharpeRatio = dailyReturn / returnStd * np.sqrt(240)
+        else:
+            sharpeRatio = 0
         
         # 输出统计结果
         self.output('-' * 30)
@@ -1039,9 +1049,9 @@ class BacktestingEngine(object):
         self.output(u'日均成交金额：\t%s' % formatNumber(dailyTurnover))
         self.output(u'日均成交笔数：\t%s' % formatNumber(dailyTradeCount))
         
-        #self.output(u'日均收益率：\t%s%%' % formatNumber(dailyReturn))
-       # self.output(u'收益标准差：\t%s%%' % formatNumber(returnStd))
-        #self.output(u'Sharpe Ratio：\t%s' % formatNumber(sharpeRatio))
+        self.output(u'日均收益率：\t%s%%' % formatNumber(dailyReturn))
+        self.output(u'收益标准差：\t%s%%' % formatNumber(returnStd))
+        self.output(u'Sharpe Ratio：\t%s' % formatNumber(sharpeRatio))
 
         # 绘图
         fig = plt.figure(figsize=(10, 16))

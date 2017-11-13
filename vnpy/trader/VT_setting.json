@@ -2,16 +2,16 @@
 	"fontFamily": "微软雅黑",
 	"fontSize": 12,
 
-	"mongoHost": "localhost",
+	"mongoJDHost": "116.196.118.219",
 	"mongoPort": 27017,
+	"mongoHost": "127.0.0.1",
 	"mongoLogging": true,
 
 	"darkStyle": true,
 	"language": "chinese",
 
-	"mysqlUrl":"mysql://root:123@localhost:3306/vnpy?charset=utf8",
-
-	"quoteUrl":"mysql://root:123@localhost:3306/quote?charset=utf8",
-	"btiUrl":"mysql://root:123@localhost:3306/bti?charset=utf8",
-	"simnowUrl":"mysql://root:123@localhost:3306/simnow?charset=utf8"
+	"mysqlUrl":"mysql://root:123@116.196.118.219:3306/vnpy?charset=utf8",
+	"quoteUrl":"mysql://root:123@116.196.118.219:3306/quote?charset=utf8",
+	"btiUrl":"mysql://root:123@116.196.118.219:3306/bti?charset=utf8",
+	"simnowUrl":"mysql://root:123@116.196.118.219:3306/simnow?charset=utf8"
 }

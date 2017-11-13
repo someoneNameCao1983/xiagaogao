@@ -17,6 +17,7 @@ from vnpy.api.ctp import MdApi, TdApi, defineDict
 from vnpy.trader.vtGateway import *
 from vnpy.trader.vtFunction import getJsonPath, getTempPath
 from vnpy.trader.vtConstant import GATEWAYTYPE_FUTURES
+from vnpy.cty.tools import *
 from .language import text
 
 
@@ -344,20 +345,20 @@ class CtpMdApi(MdApi):
         #tick.date = data['TradingDay']
         tick.date = datetime.now().strftime('%Y%m%d')   
         
-        tick.openPrice = data['OpenPrice']
-        tick.highPrice = data['HighestPrice']
-        tick.lowPrice = data['LowestPrice']
-        tick.preClosePrice = data['PreClosePrice']
+        tick.openPrice = roundPrice(data['OpenPrice'])
+        tick.highPrice = roundPrice(data['HighestPrice'])
+        tick.lowPrice = roundPrice(data['LowestPrice'])
+        tick.preClosePrice = roundPrice(data['PreClosePrice'])
         
-        tick.upperLimit = data['UpperLimitPrice']
-        tick.lowerLimit = data['LowerLimitPrice']
+        tick.upperLimit = roundPrice(data['UpperLimitPrice'])
+        tick.lowerLimit = roundPrice(data['LowerLimitPrice'])
         
         # CTP只有一档行情
-        tick.bidPrice1 = data['BidPrice1']
+        tick.bidPrice1 = roundPrice(data['BidPrice1'])
         tick.bidVolume1 = data['BidVolume1']
-        tick.askPrice1 = data['AskPrice1']
+        tick.askPrice1 = roundPrice(data['AskPrice1'])
         tick.askVolume1 = data['AskVolume1']
-        
+        saveEntityToMysql(tick, 'Quote')
         self.gateway.onTick(tick)
         
     #---------------------------------------------------------------------- 

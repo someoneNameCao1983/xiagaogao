@@ -277,8 +277,7 @@ class CtaEngine(object):
         tick.lowPrice = 0.00
         tick.openPrice = 0.00
         '''
-
-        saveEntityToMysql(tick, 'Simnow')
+        #saveEntityToMysql(tick, 'Simnow')
     #----------------------------------------------------------------------
     def processOrderEvent(self, event):
         """处理委托推送"""
@@ -612,7 +611,6 @@ class CtaEngine(object):
         """取整价格到合约最小价格变动"""
         if not priceTick:
             return price
-        
         newPrice = round(price/priceTick, 0) * priceTick
         return newPrice    
     

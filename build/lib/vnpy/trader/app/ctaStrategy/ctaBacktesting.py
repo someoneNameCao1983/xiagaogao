@@ -11,11 +11,13 @@ from collections import OrderedDict
 from itertools import product
 import multiprocessing
 import copy
-
+from vnpy.trader.vtConstant import (EMPTY_STRING, EMPTY_UNICODE,
+                                    EMPTY_FLOAT, EMPTY_INT)
 import pymongo
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from vnpy.cty.tools import *
 
 # 如果安装了seaborn则设置为白色风格
 try:
@@ -23,14 +25,11 @@ try:
     sns.set_style('whitegrid')  
 except ImportError:
     pass
-
 from vnpy.trader.vtGlobal import globalSetting
 from vnpy.trader.vtObject import VtTickData, VtBarData
 from vnpy.trader.vtConstant import *
 from vnpy.trader.vtGateway import VtOrderData, VtTradeData
-
-from .ctaBase import *
-
+from vnpy.trader.app.ctaStrategy.ctaBase import *
 
 ########################################################################
 class BacktestingEngine(object):
@@ -198,7 +197,7 @@ class BacktestingEngine(object):
 
         # 载入初始化需要用的数据
         flt = {'datetime':{'$gte':self.dataStartDate,
-                           '$lt':self.strategyStartDate}}        
+                           '$lt':self.strategyStartDate}}
         initCursor = collection.find(flt).sort('datetime')
         
         # 将数据从查询指针中读取出，并生成列表
@@ -250,7 +249,6 @@ class BacktestingEngine(object):
             func(data)     
             
         self.output(u'数据回放结束')
-        
     #----------------------------------------------------------------------
     def newBar(self, bar):
         """新的K线"""
@@ -268,7 +266,14 @@ class BacktestingEngine(object):
         """新的Tick"""
         self.tick = tick
         self.dt = tick.datetime
-        
+
+        quoteH = self.dt.strftime('%H')
+        quoteMin = self.dt.strftime('%M')
+        quoteS = self.dt.strftime('%S')
+        #print quoteH + ':' + quoteMin
+        if quoteH == '14' and quoteMin == '59':
+            return
+
         self.crossLimitOrder()
         self.crossStopOrder()
         self.strategy.onTick(tick)
@@ -287,6 +292,7 @@ class BacktestingEngine(object):
     #----------------------------------------------------------------------
     def crossLimitOrder(self):
         """基于最新数据撮合限价单"""
+
         # 先确定会撮合成交的价格
         if self.mode == self.BAR_MODE:
             buyCrossPrice = self.bar.low        # 若买入方向限价单价格高于该价格，则会成交
@@ -298,7 +304,12 @@ class BacktestingEngine(object):
             sellCrossPrice = self.tick.bidPrice1
             buyBestCrossPrice = self.tick.askPrice1
             sellBestCrossPrice = self.tick.bidPrice1
-        
+            '''
+            buyCrossPrice = self.tick.lastPrice
+            sellCrossPrice = self.tick.lastPrice
+            buyBestCrossPrice = self.tick.lastPrice
+            sellBestCrossPrice = self.tick.lastPrice
+            '''
         # 遍历限价单字典中的所有限价单
         for orderID, order in self.workingLimitOrderDict.items():
             # 推送委托进入队列（未成交）的状态更新
@@ -459,12 +470,13 @@ class BacktestingEngine(object):
             order.offset = OFFSET_OPEN
         elif orderType == CTAORDER_COVER:
             order.direction = DIRECTION_LONG
-            order.offset = OFFSET_CLOSE     
-        
+            order.offset = OFFSET_CLOSE
+
         # 保存到限价单字典中
         self.workingLimitOrderDict[orderID] = order
         self.limitOrderDict[orderID] = order
-        
+        order2 = copy.deepcopy(order)
+        saveEntityToMysql(order2, 'BTI')
         return orderID
     
     #----------------------------------------------------------------------
@@ -547,8 +559,15 @@ class BacktestingEngine(object):
         """记录日志"""
         log = str(self.dt) + ' ' + content 
         self.logList.append(log)
-        
+    #----------------------------------------------------------------------
+    def saveTradeDict(self):
+        """记录日志"""
+        self.output(u'trade record 入库')
+        saveEntityListToMysql(self.tradeDict, 'BTI')
 
+    def saveDaliyResultDict(self):
+        """记录日志"""
+        self.output(u'daliy record 入库')
     #------------------------------------------------
     # 结果计算相关
     #------------------------------------------------      
@@ -558,6 +577,7 @@ class BacktestingEngine(object):
         """
         计算回测结果
         """
+
         self.output(u'计算回测结果')
         
         # 首先基于回测后的成交记录，计算每笔交易的盈亏
@@ -569,11 +589,14 @@ class BacktestingEngine(object):
         tradeTimeList = []          # 每笔成交时间戳
         posList = [0]               # 每笔成交后的持仓情况        
 
+        # 生成DataFrame
+        #resultDf = pd.DataFrame.from_dict(self.tradeDict.values())
+        #saveDataFrameToMysql(resultDf, 'back_testing_trade')
+        self.output(u'入库')
         for trade in self.tradeDict.values():
             # 复制成交对象，因为下面的开平仓交易配对涉及到对成交数量的修改
             # 若不进行复制直接操作，则计算完后所有成交的数量会变成0
             trade = copy.copy(trade)
-            
             # 多头交易
             if trade.direction == DIRECTION_LONG:
                 # 如果尚无空头交易
@@ -899,9 +922,8 @@ class BacktestingEngine(object):
 
     #----------------------------------------------------------------------
     def updateDailyClose(self, dt, price):
-        """更新每日收盘价"""
+        """更新每日收盘价，根据交易日，构建DailyResult对象，放入集合中"""
         date = dt.date()
-        
         if date not in self.dailyResultDict:
             self.dailyResultDict[date] = DailyResult(date, price)
         else:
@@ -917,7 +939,7 @@ class BacktestingEngine(object):
             date = trade.dt.date()
             dailyResult = self.dailyResultDict[date]
             dailyResult.addTrade(trade)
-            
+
         # 遍历计算每日结果
         previousClose = 0
         openPosition = 0
@@ -929,7 +951,7 @@ class BacktestingEngine(object):
             openPosition = dailyResult.closePosition
             
         # 生成DataFrame
-        resultDict = {k:[] for k in dailyResult.__dict__.keys()}
+        resultDict = {k: [] for k in dailyResult.__dict__.keys()}
         for dailyResult in self.dailyResultDict.values():
             for k, v in dailyResult.__dict__.items():
                 resultDict[k].append(v)
@@ -938,7 +960,7 @@ class BacktestingEngine(object):
         
         # 计算衍生数据
         resultDf = resultDf.set_index('date')
-        
+
         return resultDf
     
     #----------------------------------------------------------------------
@@ -946,12 +968,15 @@ class BacktestingEngine(object):
         """显示按日统计的交易结果"""
         if not df:
             df = self.calculateDailyResult()
-
+        # to mysql
+        #df2 = copy.deepcopy(df)
+        #del df2['tradeList']
+        #saveDataFrameToMysql(df2, 'daily_rs')
         df['balance'] = df['netPnl'].cumsum() + self.capital
         df['return'] = (np.log(df['balance']) - np.log(df['balance'].shift(1))).fillna(0)
         df['highlevel'] = df['balance'].rolling(min_periods=1,window=len(df),center=False).max()
-        df['drawdown'] = df['balance'] - df['highlevel']        
-        
+        df['drawdown'] = df['balance'] - df['highlevel']
+
         # 计算统计结果
         startDate = df.index[0]
         endDate = df.index[-1]
@@ -979,13 +1004,13 @@ class BacktestingEngine(object):
         dailyTradeCount = totalTradeCount / totalDays
         
         totalReturn = (endBalance/self.capital - 1) * 100
-        dailyReturn = df['return'].mean() * 100
-        returnStd = df['return'].std() * 100
-        
-        if returnStd:
-            sharpeRatio = dailyReturn / returnStd * np.sqrt(240)
-        else:
-            sharpeRatio = 0
+       # dailyReturn = df['return'].mean() * 100
+        #returnStd = df['return'].std() * 100
+        #
+        #if returnStd:
+        #    sharpeRatio = dailyReturn / returnStd * np.sqrt(240)
+        #else:
+        #    sharpeRatio = 0
         
         # 输出统计结果
         self.output('-' * 30)
@@ -1014,10 +1039,10 @@ class BacktestingEngine(object):
         self.output(u'日均成交金额：\t%s' % formatNumber(dailyTurnover))
         self.output(u'日均成交笔数：\t%s' % formatNumber(dailyTradeCount))
         
-        self.output(u'日均收益率：\t%s%%' % formatNumber(dailyReturn))
-        self.output(u'收益标准差：\t%s%%' % formatNumber(returnStd))
-        self.output(u'Sharpe Ratio：\t%s' % formatNumber(sharpeRatio))
-        
+        #self.output(u'日均收益率：\t%s%%' % formatNumber(dailyReturn))
+       # self.output(u'收益标准差：\t%s%%' % formatNumber(returnStd))
+        #self.output(u'Sharpe Ratio：\t%s' % formatNumber(sharpeRatio))
+
         # 绘图
         fig = plt.figure(figsize=(10, 16))
         
@@ -1064,30 +1089,31 @@ class TradingResult(object):
 
 
 ########################################################################
+
 class DailyResult(object):
     """每日交易的结果"""
-
     #----------------------------------------------------------------------
+
     def __init__(self, date, closePrice):
         """Constructor"""
         self.date = date                # 日期
         self.closePrice = closePrice    # 当日收盘价
-        self.previousClose = 0          # 昨日收盘价
+        self.previousClose = EMPTY_FLOAT          # 昨日收盘价
         
         self.tradeList = []             # 成交列表
-        self.tradeCount = 0             # 成交数量
+        self.tradeCount = EMPTY_INT             # 成交数量
         
-        self.openPosition = 0           # 开盘时的持仓
-        self.closePosition = 0          # 收盘时的持仓
+        self.openPosition = EMPTY_INT           # 开盘时的持仓
+        self.closePosition = EMPTY_INT         # 收盘时的持仓
         
-        self.tradingPnl = 0             # 交易盈亏
-        self.positionPnl = 0            # 持仓盈亏
-        self.totalPnl = 0               # 总盈亏
+        self.tradingPnl = EMPTY_FLOAT            # 交易盈亏
+        self.positionPnl = EMPTY_FLOAT         # 持仓盈亏
+        self.totalPnl = EMPTY_FLOAT             # 总盈亏
         
-        self.turnover = 0               # 成交量
+        self.turnover = EMPTY_INT               # 成交量
         self.commission = 0             # 手续费
         self.slippage = 0               # 滑点
-        self.netPnl = 0                 # 净盈亏
+        self.netPnl = EMPTY_FLOAT                 # 净盈亏
         
     #----------------------------------------------------------------------
     def addTrade(self, trade):
@@ -1112,15 +1138,17 @@ class DailyResult(object):
         
         for trade in self.tradeList:
             if trade.direction == DIRECTION_LONG:
-                posChange = trade.volume
+                posChange = int(trade.volume)
             else:
-                posChange = -trade.volume
-                
-            self.tradingPnl += posChange * (self.closePrice - trade.price) * size
+                posChange = int(trade.volume)*(-1)
+            """逐笔成交计算盈亏以结算价"""
+            self.tradingPnl += posChange * (self.closePrice - float(trade.price)) * size
+            """持仓多空"""
             self.closePosition += posChange
-            self.turnover += trade.price * trade.volume * size
-            self.commission += trade.price * trade.volume * size * rate
-            self.slippage += trade.volume * size * slippage
+            """成交金额"""
+            self.turnover += float(trade.price) * int(trade.volume) * size
+            self.commission += float(trade.price) * int(trade.volume) * size * rate
+            self.slippage += int(trade.volume) * size * slippage
         
         # 汇总
         self.totalPnl = self.tradingPnl + self.positionPnl

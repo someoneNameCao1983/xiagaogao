@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from time import time
 import pymongo
 import copy
+import sys
 from sqlalchemy.ext.declarative import *
 #
 TICK_DB_NAME = 'VnTrader_Tick_Db'
@@ -71,7 +72,7 @@ def saveEntityToMysql(Entity,DbName):
     session = semake()
     session.add(Entity)
     session.commit()
-
+#行情转换到mongodb
 def convert2Mongo(Conract,DbName):
     start = time()
     # simnow模拟
@@ -97,7 +98,7 @@ def convert2Mongo(Conract,DbName):
     client = pymongo.MongoClient(globalSetting['mongoHost'], globalSetting['mongoPort'])
     collection = client[TICK_DB_NAME][Conract]
     collection.drop()
-    collection.ensure_index([('_id', pymongo.ASCENDING)], unique=True)
+    collection.ensure_index([('_id', pymongo.ASCENDING)])
 
     for row in rs:
         tick = VtTickData()
@@ -125,3 +126,13 @@ def convert2Mongo(Conract,DbName):
                  "askVolume1": tick.askVolume1, "bidVolume1": tick.bidVolume1}
         collection.insert_one(tick2)
     print u'插入完毕，耗时：%s' % (time() - start)
+
+#处理一下极大数和极小数
+def roundPrice(price):
+    if price == sys.float_info.max:
+        newPrice = -1
+    elif price == sys.float_info.min:
+        newPrice = -2
+    else:
+        newPrice = price
+    return newPrice

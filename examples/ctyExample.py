@@ -2,7 +2,6 @@
 
 # AUTHOR:Tianyang.Cao
 # WeChat/QQ: 54831165
-import tushare as ts
 from vnpy.cty.tools import *
 from vnpy.trader.vtObject import *
 from vnpy.trader.vtGlobal import globalSetting
@@ -11,12 +10,15 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import *
 from time import time
 from sqlalchemy import *
+import sys
+import math
 import pymongo
 from vnpy.trader.app.ctaStrategy.ctaBase import *
 from vnpy.trader.vtConstant import (EMPTY_STRING, EMPTY_UNICODE,
                                     EMPTY_FLOAT, EMPTY_INT)
 Base = declarative_base()
-#convert2Mongo('rb1801','Simnow')
+
+convert2Mongo('rb1801','Simnow')
 '''
 #mysql 连接
 start = time()
@@ -27,7 +29,6 @@ m = MetaData(bind=engine)
 tick = Table('monitor_tick_data', m, autoload=True)
 s = tick.select()
 rs = s.execute()
-
 #mongodb 连接
 client = pymongo.MongoClient(globalSetting['mongoHost'], globalSetting['mongoPort'])
 collection = client[TICK_DB_NAME]['rb1801']

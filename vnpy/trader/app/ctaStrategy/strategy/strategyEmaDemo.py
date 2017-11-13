@@ -170,8 +170,8 @@ class EmaDemoStrategy(CtaTemplate):
             keyTick = KeyTickData()
             keyTick.datetime = bar.datetime
             keyTick.lastPrice = bar.close
-            keyTick.exchange = 'keyQuote'
-            saveEntityToMysql(keyTick, 'BTI')
+            keyTick.exchange = 'keyQuote crossOver'
+            #saveEntityToMysql(keyTick, 'BTI')
         # 死叉和金叉相反
         elif crossBelow:
             if self.pos == 0:
@@ -182,7 +182,8 @@ class EmaDemoStrategy(CtaTemplate):
             keyTick = KeyTickData()
             keyTick.datetime = bar.datetime
             keyTick.lastPrice = bar.close
-            saveEntityToMysql(keyTick, 'BTI')
+            keyTick.exchange = 'keyQuote crossBelow'
+            #saveEntityToMysql(keyTick, 'BTI')
         # 发出状态更新事件
         self.putEvent()
         
