@@ -136,13 +136,14 @@ class EmaDemoStrategy(CtaTemplate):
     #----------------------------------------------------------------------
     def onBar(self, bar):
         """收到Bar推送（必须由用户继承实现）"""
-        # 计算快慢均线
+        # 计算快慢均线 19天是慢
         if not self.fastMa0:        
             self.fastMa0 = bar.close
             self.fastMa.append(self.fastMa0)
         else:
             self.fastMa1 = self.fastMa0
             self.fastMa0 = bar.close * self.fastK + self.fastMa0 * (1 - self.fastK)
+            #self.fastMa0 = bar.close * 2/13 + self.fastMa0 * 11/13
             self.fastMa.append(self.fastMa0)
 
         if not self.slowMa0:
@@ -151,6 +152,7 @@ class EmaDemoStrategy(CtaTemplate):
         else:
             self.slowMa1 = self.slowMa0
             self.slowMa0 = bar.close * self.slowK + self.slowMa0 * (1 - self.slowK)
+            #self.slowMa0 = bar.close * 2/27 + self.slowMa0 * 25/27
             self.slowMa.append(self.slowMa0)
             
         # 判断买卖

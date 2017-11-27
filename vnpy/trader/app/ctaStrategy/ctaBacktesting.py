@@ -215,7 +215,7 @@ class BacktestingEngine(object):
         else:
             flt = {'datetime':{'$gte':self.strategyStartDate,
                                '$lte':self.dataEndDate}}  
-        self.dbCursor = collection.find(flt).sort('datetime')
+        self.dbCursor = collection.find(flt).sort('_id')
         
         self.output(u'载入完成，数据量：%s' %(initCursor.count() + self.dbCursor.count()))
         

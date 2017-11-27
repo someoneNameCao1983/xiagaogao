@@ -1005,7 +1005,6 @@ class CtpTdApi(TdApi):
         order.cancelTime = data['CancelTime']
         order.frontID = data['FrontID']
         order.sessionID = data['SessionID']
-        
         # 推送
         self.gateway.onOrder(order)
         
@@ -1037,7 +1036,7 @@ class CtpTdApi(TdApi):
         trade.price = data['Price']
         trade.volume = data['Volume']
         trade.tradeTime = data['TradeTime']
-        
+        trade.dt = datetime.now().strftime('%Y%m%d')
         # 推送
         self.gateway.onTrade(trade)
         

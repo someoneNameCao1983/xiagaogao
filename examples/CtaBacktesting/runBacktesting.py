@@ -13,6 +13,7 @@ from vnpy.trader.app.ctaStrategy.ctaBacktesting import BacktestingEngine, MINUTE
 
 if __name__ == '__main__':
     from vnpy.trader.app.ctaStrategy.strategy.strategyEmaDemo import EmaDemoStrategy
+    from vnpy.trader.app.ctaStrategy.ctyStrategy.ctyEmaDemo import CtyEmaDemoStrategy
 
     start = time()
 
