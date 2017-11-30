@@ -31,7 +31,8 @@ from vnpy.trader.vtObject import VtTickData, VtBarData
 from vnpy.trader.vtConstant import *
 from vnpy.trader.vtGateway import VtOrderData, VtTradeData
 from vnpy.trader.app.ctaStrategy.ctaBase import *
-
+from sqlalchemy.ext.declarative import declarative_base
+Base = declarative_base()
 ########################################################################
 class BacktestingEngine(object):
     """
@@ -87,7 +88,7 @@ class BacktestingEngine(object):
         self.tradeDict = OrderedDict()  # 成交字典
         
         self.logList = []               # 日志记录
-        
+        self.resultList = []            # 平仓记录
         # 当前最新数据，用于模拟成交用
         self.tick = None
         self.bar = None
@@ -256,7 +257,7 @@ class BacktestingEngine(object):
         """新的K线"""
         self.bar = bar
         self.dt = bar.datetime
-        
+
         self.crossLimitOrder()      # 先撮合限价单
         self.crossStopOrder()       # 再撮合停止单
         self.strategy.onBar(bar)    # 推送K线到策略中
@@ -352,7 +353,7 @@ class BacktestingEngine(object):
                 else:
                     trade.price = max(order.price, sellBestCrossPrice)
                     self.strategy.pos -= order.totalVolume
-                
+                #print ("空头加仓 price:%f , min:%s, pos:%d" % (trade.price, self.dt.strftime('%H:%M:%S'), self.strategy.pos))
                 trade.volume = order.totalVolume
                 trade.tradeTime = self.dt.strftime('%H:%M:%S')
                 trade.dt = self.dt
@@ -367,7 +368,7 @@ class BacktestingEngine(object):
                 
                 # 从字典中删除该限价单
                 del self.workingLimitOrderDict[orderID]
-                
+            #print ("未成交 price:%f , min:%s, pos:%d" % (order.price, self.dt.strftime('%H:%M:%S'), self.strategy.pos))
     #----------------------------------------------------------------------
     def crossStopOrder(self):
         """基于最新数据撮合停止单"""
@@ -441,7 +442,7 @@ class BacktestingEngine(object):
                 self.strategy.onStopOrder(so)
                 self.strategy.onOrder(order)
                 self.strategy.onTrade(trade)
-    
+
     #------------------------------------------------
     # 策略接口相关
     #------------------------------------------------      
@@ -473,7 +474,7 @@ class BacktestingEngine(object):
         elif orderType == CTAORDER_COVER:
             order.direction = DIRECTION_LONG
             order.offset = OFFSET_CLOSE
-
+        #print ('direction %s, offset %s, orderType%s' % (order.direction,order.offset,orderType))
         # 保存到限价单字典中
         self.workingLimitOrderDict[orderID] = order
         self.limitOrderDict[orderID] = order
@@ -493,7 +494,7 @@ class BacktestingEngine(object):
         """发停止单（本地实现）"""
         self.stopOrderCount += 1
         stopOrderID = STOPORDERPREFIX + str(self.stopOrderCount)
-        
+
         so = StopOrder()
         so.vtSymbol = vtSymbol
         so.price = self.roundToPriceTick(price)
@@ -501,7 +502,7 @@ class BacktestingEngine(object):
         so.strategy = strategy
         so.status = STOPORDER_WAITING
         so.stopOrderID = stopOrderID
-        
+
         if orderType == CTAORDER_BUY:
             so.direction = DIRECTION_LONG
             so.offset = OFFSET_OPEN
@@ -513,17 +514,17 @@ class BacktestingEngine(object):
             so.offset = OFFSET_OPEN
         elif orderType == CTAORDER_COVER:
             so.direction = DIRECTION_LONG
-            so.offset = OFFSET_CLOSE           
-        
+            so.offset = OFFSET_CLOSE
+
         # 保存stopOrder对象到字典中
         self.stopOrderDict[stopOrderID] = so
         self.workingStopOrderDict[stopOrderID] = so
-        
+        #print ('stop order direction %s, offset %s, orderType%s' % (order.direction, order.offset, orderType))
         # 推送停止单初始更新
-        self.strategy.onStopOrder(so)        
-        
+        self.strategy.onStopOrder(so)
+
         return stopOrderID
-    
+
     #----------------------------------------------------------------------
     def cancelStopOrder(self, stopOrderID):
         """撤销停止单"""
@@ -560,12 +561,12 @@ class BacktestingEngine(object):
         log = str(self.dt) + ' ' + content 
         self.logList.append(log)
     #----------------------------------------------------------------------
-    def saveDictData(self):
+    def saveBackTestingData(self):
         """记录日志"""
-        saveEntityListToMysql(self.tradeDict, 'BTI')
-        self.output(u'trade record 入库')
-        saveEntityListToMysql(self.limitOrderDict, 'BTI')
-        self.output(u'order record 入库')
+        saveEntityDictToMysql(self.tradeDict, 'BTI')
+        saveEntityDictToMysql(self.limitOrderDict, 'BTI')
+        saveEntityListToMysql(self.resultList, 'BTI')
+        self.output(u'tradeDict,limitOrderDict,resultList record 入库')
 
 
 
@@ -585,7 +586,7 @@ class BacktestingEngine(object):
         self.output(u'计算回测结果')
         
         # 首先基于回测后的成交记录，计算每笔交易的盈亏
-        resultList = []             # 交易结果列表
+        #resultList = []             # 交易结果列表
         
         longTrade = []              # 未平仓的多头交易
         shortTrade = []             # 未平仓的空头交易
@@ -596,7 +597,7 @@ class BacktestingEngine(object):
         # 生成DataFrame
         #resultDf = pd.DataFrame.from_dict(self.tradeDict.values())
         #saveDataFrameToMysql(resultDf, 'back_testing_trade')
-        self.output(u'入库')
+
         for trade in self.tradeDict.values():
             # 复制成交对象，因为下面的开平仓交易配对涉及到对成交数量的修改
             # 若不进行复制直接操作，则计算完后所有成交的数量会变成0
@@ -617,7 +618,7 @@ class BacktestingEngine(object):
                         result = TradingResult(entryTrade.price, entryTrade.dt, 
                                                exitTrade.price, exitTrade.dt,
                                                -closedVolume, self.rate, self.slippage, self.size)
-                        resultList.append(result)
+                        self.resultList.append(result)
                         
                         posList.extend([-1,0])
                         tradeTimeList.extend([result.entryDt, result.exitDt])
@@ -661,7 +662,7 @@ class BacktestingEngine(object):
                         result = TradingResult(entryTrade.price, entryTrade.dt, 
                                                exitTrade.price, exitTrade.dt,
                                                closedVolume, self.rate, self.slippage, self.size)
-                        resultList.append(result)
+                        self.resultList.append(result)
                         
                         posList.extend([1,0])
                         tradeTimeList.extend([result.entryDt, result.exitDt])
@@ -698,15 +699,15 @@ class BacktestingEngine(object):
         for trade in longTrade:
             result = TradingResult(trade.price, trade.dt, endPrice, self.dt, 
                                    trade.volume, self.rate, self.slippage, self.size)
-            resultList.append(result)
+            self.resultList.append(result)
             
         for trade in shortTrade:
             result = TradingResult(trade.price, trade.dt, endPrice, self.dt, 
                                    -trade.volume, self.rate, self.slippage, self.size)
-            resultList.append(result)            
+            self.resultList.append(result)
         
         # 检查是否有交易
-        if not resultList:
+        if not self.resultList:
             self.output(u'无交易结果')
             return {}
         
@@ -730,7 +731,7 @@ class BacktestingEngine(object):
         totalWinning = 0        # 总盈利金额		
         totalLosing = 0         # 总亏损金额        
         
-        for result in resultList:
+        for result in self.resultList:
             capital += result.pnl
             maxCapital = max(capital, maxCapital)
             drawdown = capital - maxCapital
@@ -862,6 +863,7 @@ class BacktestingEngine(object):
         engine.execute(text('delete from trade_data'))
         engine.execute(text('delete from key_tick_data'))
         engine.execute(text('delete from order_data'))
+        engine.execute(text('delete from trading_result'))
         
     #----------------------------------------------------------------------
     def runOptimization(self, strategyClass, optimizationSetting):
@@ -1076,13 +1078,26 @@ class BacktestingEngine(object):
         
         
 ########################################################################
-class TradingResult(object):
-    """每笔交易的结果"""
 
+class TradingResult(Base):
+    """每笔交易的结果"""
+    __tablename__ = 'trading_result'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    entryPrice = Column(FLOAT(10, 4))
+    exitPrice = Column(FLOAT(10, 4))
+    # 成交数据
+    entryDt = Column(String(32))
+    exitDt = Column(String(32))
+    volume = Column(Integer)
+    turnover = Column(Integer)
+    commission = Column(Integer)
+    slippage = Column(Integer)
+    pnl = Column(FLOAT(32))
     #----------------------------------------------------------------------
     def __init__(self, entryPrice, entryDt, exitPrice, 
                  exitDt, volume, rate, slippage, size):
         """Constructor"""
+
         self.entryPrice = entryPrice    # 开仓价格
         self.exitPrice = exitPrice      # 平仓价格
         

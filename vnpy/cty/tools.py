@@ -8,6 +8,7 @@ from vnpy.trader.vtObject import *
 from vnpy.trader.vtGlobal import globalSetting
 from sqlalchemy.orm import sessionmaker
 from time import time
+from datetime import datetime, timedelta
 import pymongo
 import copy
 import sys
@@ -28,7 +29,7 @@ def saveDataFrameToMysql(df, tname, clear=True):
     print u'插入完毕，耗时：%s' % (time() - start)
     
 # 插入mysql
-def saveEntityListToMysql(EntityDict,DbName):
+def saveEntityDictToMysql(EntityDict,DbName):
     start = time()
     # simnow模拟
     if DbName == 'Simnow':
@@ -54,7 +55,6 @@ def saveEntityListToMysql(EntityDict,DbName):
     session.commit()
     print u'插入完毕，耗时：%s' % (time() - start)
 # 插入mysql
-
 def saveEntityToMysql(Entity,DbName):
     #simnow模拟
     if DbName == 'Simnow':
@@ -72,12 +72,38 @@ def saveEntityToMysql(Entity,DbName):
     session = semake()
     session.add(Entity)
     session.commit()
+# 插入mysql
+def saveEntityListToMysql(EntityList,DbName):
+    start = time()
+    #simnow模拟
+    if DbName == 'Simnow':
+        engine = create_engine(globalSetting['simnowUrl'])
+    # 行情库
+    elif DbName == 'Quote':
+        engine = create_engine(globalSetting['quoteUrl'])
+    #回测库
+    elif DbName == 'BTI':
+        engine = create_engine(globalSetting['btiUrl'])
+    else:
+        print '没有指定数据'
+        engine = create_engine(globalSetting['mysqlUrl'])
+    semake = sessionmaker(bind=engine)
+    session = semake()
+    tradeCount = 0
+    for trade in EntityList:
+        trade = copy.copy(trade)
+        tradeCount += 1
+        session.add(trade)
+        if tradeCount % 1000 == 0:
+            session.commit()
+    session.commit()
+    print u'插入完毕，耗时：%s' % (time() - start)
 #行情转换到mongodb
 def convert2Mongo(Conract,DbName):
     start = time()
     # simnow模拟
     if DbName == 'Simnow':
-        engine = create_engine(globalSetting['simnowUrl'])
+        engine = create_engine(globalSetting['dssUrl'])
     # 行情库
     elif DbName == 'Quote':
         engine = create_engine(globalSetting['quoteUrl'])
@@ -93,13 +119,12 @@ def convert2Mongo(Conract,DbName):
     tick = Table('tick_data', m, autoload=True)
     s = tick.select()
     rs = s.execute()
-
     # mongodb 连接
     client = pymongo.MongoClient(globalSetting['mongoHost'], globalSetting['mongoPort'])
     collection = client[TICK_DB_NAME][Conract]
     collection.drop()
     collection.ensure_index([('_id', pymongo.ASCENDING)])
-
+    count = 0
     for row in rs:
         tick = VtTickData()
         tick.id = row['id']
@@ -121,11 +146,16 @@ def convert2Mongo(Conract,DbName):
         tick.vtSymbol = 'rb1801'
         flt = {'datetime': tick.datetime}
         tick2 = {"_id": tick.id, "symbol": tick.symbol, "vtSymbol": tick.vtSymbol, "lastPrice": tick.lastPrice, "highPrice": tick.highPrice,
-                 "lowPrice": tick.lowPrice, "datetime": tick.datetime, "exchange": tick.exchange,"date": tick.date,"time": tick.time,
+                 "lowPrice": tick.lowPrice,
+                 "datetime": tick.datetime,
+                 "exchange": tick.exchange, "date": tick.date, "time": tick.time,
                  "openPrice": tick.openPrice, "askPrice1": tick.askPrice1, "bidPrice1": tick.bidPrice1,"datetime": tick.datetime,
                  "askVolume1": tick.askVolume1, "bidVolume1": tick.bidVolume1}
         collection.insert_one(tick2)
-    print u'插入完毕，耗时：%s' % (time() - start)
+        count += 1
+        if count % 5000 == 0 :
+            print ("%d record import to mongodb" % count)
+    print (u'%d 条记录 插入完毕，耗时：%s' % (count,(time() - start )))
 
 #处理一下极大数和极小数
 def roundPrice(price):

@@ -5,15 +5,13 @@
 """
 
 from __future__ import division
-from time import time
-from sqlalchemy import *
-from vnpy.trader.vtGlobal import globalSetting
-from vnpy.trader.app.ctaStrategy.ctaBacktesting import BacktestingEngine, MINUTE_DB_NAME,TICK_DB_NAME
 
+from time import time
+
+from vnpy.trader.app.ctaStrategy.ctaBacktesting import BacktestingEngine, TICK_DB_NAME
 
 if __name__ == '__main__':
-    from vnpy.trader.app.ctaStrategy.strategy.strategyEmaDemo import EmaDemoStrategy
-    from vnpy.trader.app.ctaStrategy.ctyStrategy.ctyEmaDemo import CtyEmaDemoStrategy
+    from vnpy.trader.app.ctaStrategy.strategy.strategyCtyDemo import CtyEmaDemoStrategy
 
     start = time()
 
@@ -24,7 +22,7 @@ if __name__ == '__main__':
     engine.setBacktestingMode(engine.TICK_MODE)
 
     # 设置回测用的数据起始日期 tick data no need initDay
-    engine.setStartDate('20171101', initDays=0)
+    engine.setStartDate('20171127', initDays=0)
     
     # 设置产品相关参数
     engine.setSlippage(0.2)     # 股指1跳
@@ -37,16 +35,16 @@ if __name__ == '__main__':
     
     # 在引擎中创建策略对象 artLengt是atr测率的参数,vtSymbol是策略模板的参数，只支持单和约测率
     d = {'vtSymbol': 'rb1801'}
-    engine.initStrategy(EmaDemoStrategy, d)
+    engine.initStrategy(CtyEmaDemoStrategy, d)
 
     # 开始跑回测
     engine.runBacktesting()
     # 显示计算收益
-    #engine.calculateBacktestingResult()
-    engine.calculateDailyResult()
+    engine.calculateBacktestingResult()
+    #engine.calculateDailyResult()
     #保存回测记录
-    engine.saveDictData()
+    engine.saveBackTestingData()
     print u'运算完毕，耗时：%s' % (time() - start)
     # 显示回测结果
-    engine.showDailyResult()
-    #engine.showBacktestingResult()
+    #engine.showDailyResult()
+    engine.showBacktestingResult()

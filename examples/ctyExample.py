@@ -18,7 +18,7 @@ from vnpy.trader.vtConstant import (EMPTY_STRING, EMPTY_UNICODE,
                                     EMPTY_FLOAT, EMPTY_INT)
 Base = declarative_base()
 
-convert2Mongo('rb1801','Simnow')
+convert2Mongo('rb1801', 'Simnow')
 '''
 #mysql 连接
 start = time()
@@ -297,11 +297,44 @@ class KeyTickData(Base):
         self.askPrice1 = EMPTY_FLOAT
         self.bidVolume1 = EMPTY_INT
         self.askVolume1 = EMPTY_INT
+
+class TradingResult(Base):
+    """每笔交易的结果"""
+    __tablename__ = 'trading_result'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    entryPrice = Column(FLOAT(10, 4))
+    exitPrice = Column(FLOAT(10, 4))
+    # 成交数据
+    entryDt =Column(String(32))
+    exitDt =Column(String(32))
+    volume = Column(Integer)
+    turnover = Column(Integer)
+    commission = Column(Integer)
+    slippage = Column(Integer)
+    pnl = Column(FLOAT(32))
+    #----------------------------------------------------------------------
+    def __init__(self):
+        """Constructor"""
+
+        self.entryPrice = 0    # 开仓价格
+        self.exitPrice = 0      # 平仓价格
+
+        self.entryDt = EMPTY_STRING          # 开仓时间datetime
+        self.exitDt = EMPTY_STRING            # 平仓时间
+
+        self.volume = 0    # 交易数量（+/-代表方向）
+
+        self.turnover = 0  # 成交金额
+        self.commission = 0                              # 手续费成本
+        self.slippage = 0                         # 滑点成本
+        self.pnl = 10                  # 净盈亏
+
+
 engine = create_engine(globalSetting['btiUrl'])
 Session = sessionmaker(bind=engine)
 s = Session()
-trade1 = KeyTickData()
-trade1.symbol = 'IF1803'
+trade1 = TradingResult()
+trade1.pnl = 230
 s.add(trade1)
 #s.add(trade4)
 Base.metadata.create_all(engine)
