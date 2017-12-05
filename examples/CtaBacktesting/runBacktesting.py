@@ -22,13 +22,13 @@ if __name__ == '__main__':
     engine.setBacktestingMode(engine.TICK_MODE)
 
     # 设置回测用的数据起始日期 tick data no need initDay
-    engine.setStartDate('20171127', initDays=0)
-    
+    engine.setStartDate('2017117', initDays=1)
+
     # 设置产品相关参数
-    engine.setSlippage(0.2)     # 股指1跳
-    engine.setRate(10/10000)   # 万0.3
-    engine.setSize(10)         # 股指合约大小
-    engine.setPriceTick(0.1)    # 股指最小价格变动
+    engine.setSlippage(0.2)     # 滑点
+    engine.setRate(5/10000)   # 万5
+    engine.setSize(10)         # 合约大小
+    engine.setPriceTick(1)    # 股指最小价格变动
     
     # 设置使用的历史数据库
     engine.setDatabase(TICK_DB_NAME, 'rb1801')

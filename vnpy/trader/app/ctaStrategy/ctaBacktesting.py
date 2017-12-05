@@ -249,8 +249,8 @@ class BacktestingEngine(object):
         for d in self.dbCursor:
             data = dataClass()
             data.__dict__ = d
-            func(data)     
-            
+            func(data)
+        self.strategy.onStop()
         self.output(u'数据回放结束')
     #----------------------------------------------------------------------
     def newBar(self, bar):
@@ -319,7 +319,7 @@ class BacktestingEngine(object):
             if not order.status:
                 order.status = STATUS_NOTTRADED
                 self.strategy.onOrder(order)
-
+            #print('process cross %s' % self.dt.strftime('%H:%M:%S'))
             # 判断是否会成交
             buyCross = (order.direction==DIRECTION_LONG and 
                         order.price>=buyCrossPrice and
