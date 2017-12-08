@@ -860,8 +860,9 @@ class BacktestingEngine(object):
         #清空回测记录
         engine = create_engine(globalSetting['btiUrl'])
         engine.echo = True
+        Base.metadata.create_all(engine)
         engine.execute(text('delete from trade_data'))
-        engine.execute(text('delete from key_tick_data'))
+        #engine.execute(text('delete from key_tick_data'))
         engine.execute(text('delete from order_data'))
         engine.execute(text('delete from trading_result'))
         

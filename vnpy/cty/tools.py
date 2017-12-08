@@ -115,6 +115,7 @@ def convert2Mongo(Conract,DbName):
         engine = create_engine(globalSetting['mysqlUrl'])
 
     #engine.echo = True
+    Base.metadata.create_all(engine)
     m = MetaData(bind=engine)
     tick = Table('tick_data', m, autoload=True)
     s = tick.select()
