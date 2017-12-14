@@ -114,18 +114,20 @@ def convert2Mongo(Conract,DbName):
         print '没有指定数据'
         engine = create_engine(globalSetting['mysqlUrl'])
 
-    #engine.echo = True
+    engine.echo = True
     Base.metadata.create_all(engine)
     m = MetaData(bind=engine)
     tick = Table('tick_data', m, autoload=True)
-    s = tick.select()
+    s = tick.select().offset(1000000).limit(2000000)
+    #s = tick.select().offset(0).limit(1000000)
     rs = s.execute()
     # mongodb 连接
     client = pymongo.MongoClient(globalSetting['mongoHost'], globalSetting['mongoPort'])
     collection = client[TICK_DB_NAME][Conract]
-    collection.drop()
-    collection.ensure_index([('_id', pymongo.ASCENDING)])
+    #collection.drop()
+    #collection.ensure_index([('_id', pymongo.ASCENDING)])
     count = 0
+    recordlist = []
     for row in rs:
         tick = VtTickData()
         tick.id = row['id']
@@ -152,10 +154,14 @@ def convert2Mongo(Conract,DbName):
                  "exchange": tick.exchange, "date": tick.date, "time": tick.time,
                  "openPrice": tick.openPrice, "askPrice1": tick.askPrice1, "bidPrice1": tick.bidPrice1,"datetime": tick.datetime,
                  "askVolume1": tick.askVolume1, "bidVolume1": tick.bidVolume1}
-        collection.insert_one(tick2)
+        recordlist.append(tick2)
         count += 1
-        if count % 5000 == 0 :
+        if count % 20000 == 0:
+            collection.insert_many(recordlist)
+            del recordlist[:]
             print ("%d record import to mongodb" % count)
+    if len(recordlist) > 0:
+        collection.insert_many(recordlist)
     print (u'%d 条记录 插入完毕，耗时：%s' % (count,(time() - start )))
 
 #处理一下极大数和极小数

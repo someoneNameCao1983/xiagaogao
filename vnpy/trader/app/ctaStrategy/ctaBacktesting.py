@@ -769,12 +769,12 @@ class BacktestingEngine(object):
 
         # 返回回测结果
         self.resultD = {}
-        self.resultD['capital'] = capital
-        self.resultD['maxCapital'] = maxCapital
-        self.resultD['drawdown'] = drawdown
+        self.resultD['capital'] = round(capital, 2)
+        self.resultD['maxCapital'] = round(maxCapital, 2)
+        self.resultD['drawdown'] = round(drawdown, 2)
         self.resultD['totalResult'] = totalResult
         self.resultD['totalTurnover'] = totalTurnover
-        self.resultD['totalCommission'] = totalCommission
+        self.resultD['totalCommission'] = round(totalCommission, 2)
         self.resultD['totalSlippage'] = totalSlippage
         self.resultD['timeList'] = timeList
         self.resultD['pnlList'] = pnlList
@@ -786,7 +786,8 @@ class BacktestingEngine(object):
         self.resultD['profitLossRatio'] = profitLossRatio
         self.resultD['posList'] = posList
         self.resultD['tradeTimeList'] = tradeTimeList
-        #return d
+
+        return self.resultD
         
     #----------------------------------------------------------------------
     def showBacktestingResult(self):
@@ -859,7 +860,7 @@ class BacktestingEngine(object):
         self.tradeDict.clear()
         #清空回测记录
         engine = create_engine(globalSetting['btiUrl'])
-        engine.echo = True
+        #engine.echo = True
         Base.metadata.create_all(engine)
         engine.execute(text('delete from trade_data'))
         #engine.execute(text('delete from key_tick_data'))
@@ -1268,8 +1269,19 @@ def optimize(strategyClass, setting, targetName,
     engine.initStrategy(strategyClass, setting)
     engine.runBacktesting()
     d = engine.calculateBacktestingResult()
+    del d['tradeTimeList']
+    del d['drawdownList']
+    del d['posList']
+    del d['pnlList']
+    del d['timeList']
+    del d['capitalList']
+    del d['totalTurnover']
+    del d['profitLossRatio']
+    del d['averageLosing']
+    del d['averageWinning']
+    del d['winningRate']
     try:
-        targetValue = d[targetName]
+        targetValue = d
     except KeyError:
         targetValue = 0            
     return (str(setting), targetValue)    
