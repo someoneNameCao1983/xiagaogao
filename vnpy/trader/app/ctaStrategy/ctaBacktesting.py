@@ -1269,6 +1269,7 @@ def optimize(strategyClass, setting, targetName,
     engine.initStrategy(strategyClass, setting)
     engine.runBacktesting()
     d = engine.calculateBacktestingResult()
+    d['drawdown'] = round(min(d['drawdownList']),2)
     del d['tradeTimeList']
     del d['drawdownList']
     del d['posList']

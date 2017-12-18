@@ -28,14 +28,17 @@ class CtyEmaDemoStrategy(CtaTemplate):
     
     # 策略参数
     initDays = 10   # 初始化数据所用的天数
-    slowKRate = 2   # 慢均线倍数
-    offsetRate = 5  # 平仓均线倍数
 
-    fastK = 5     # 快速EMA参数
+
     #slowK = 10     # 慢速EMA参数
-    offsetK = 50  # 平仓EMA参数
-    profitRate = 20  # 止盈阀值
-    maxHoldPos = 2  # 最大持仓手数，仓位
+    #offsetK = 50  # 平仓EMA参数
+    fastK = 5  # 快速EMA参数
+    slowKRate = 2   # 慢均线倍数    慢均线 = fastK * slowKRate
+    profitRate = 20  # 止盈倍数 止盈价 = 1 + moveBase * profitRate * margin
+    offsetRate = 1  # 止损倍数 止损价 = 1 - moveBase * offsetRate * margin
+    moveBase = 0.02  # 移动基数
+    maxHoldPos = 4  # 最大持仓手数，仓位
+    margin = 0.1  # 品种的保证金比例
 
     # 策略变量
     bar = None
@@ -54,9 +57,6 @@ class CtyEmaDemoStrategy(CtaTemplate):
 
     slowMa0 = EMPTY_FLOAT
     slowMa1 = EMPTY_FLOAT
-
-    offsetMa0 = EMPTY_FLOAT
-    offsetMa1 = EMPTY_FLOAT
 
     volumeFast = 0
     volumeSlow = 0
@@ -83,10 +83,12 @@ class CtyEmaDemoStrategy(CtaTemplate):
                  'author',
                  'vtSymbol',
                  'fastK',
-                 'slowRate',
+                 'slowKRate',
                  'profitRate',
-                 'maxHoldPos'
-                 'offsetK']
+                 'offsetRate',
+                 'moveBase',
+                 'maxHoldPos',
+                 'margin']
     
     # 变量列表，保存了变量的名称
     varList = ['inited',
@@ -211,6 +213,46 @@ class CtyEmaDemoStrategy(CtaTemplate):
             self.cancelOrder(orderID)
             self.orderList = []
 
+        self.closeHistory.append(float(bar.close))
+        self.bidVolumeHistory.append(float(bar.volume))
+        if len(self.closeHistory) < self.minHistroy:
+            return
+        if len(self.closeHistory) > self.maxHistroy:
+            self.closeHistory.pop(0)
+            self.bidVolumeHistory.pop(0)
+
+        closeArray = np.array(self.closeHistory)
+        volumeArray = np.array(self.bidVolumeHistory)
+        # 计算快慢均线
+        fastSMA = ta.SMA(closeArray, self.fastK)
+        slowSMA = ta.SMA(closeArray, self.fastK*self.slowKRate)
+
+        self.volumeFast = ta.MA(volumeArray, self.fastK)[-1]
+        self.volumeSlow = ta.MA(volumeArray, self.fastK*self.slowKRate)[-1]
+
+        self.fastMa0 = fastSMA[-1]
+        self.fastMa1 = fastSMA[-2]
+        self.slowMa0 = slowSMA[-1]
+        self.slowMa1 = slowSMA[-2]
+        # 判断买卖
+        # 37.93% 4,244.9，-3,130.81 29笔 开仓：17 ,加仓：12 ,止盈: 5 ,止损: 11  盈利了。。。加仓步长 +0.002 止盈 +0.02
+        #crossOver = self.fastMa0 > self.slowMa0 and self.fastMa1 < self.slowMa1 and float(bar.volume) > self.volumeSlow
+        # 36% 2,813.45 	-2,885.53 25笔 开仓：15 ,加仓：10 ,止盈: 4 ,止损: 10   盈利了
+        #crossOver = self.fastMa0 > self.slowMa30t and self.fastMa1 < self.slowMa30y and bar.volume > self.volumeFast and self.volumeFast > self.volumeSlow
+        # 29% 2,050.74 -3,482.14 31笔 开仓：20 ,加仓：11 ,止盈: 4 ,止损: 15
+        crossOver = self.fastMa0 > self.slowMa0 and self.fastMa1 < self.slowMa1 and bar.close > self.fastMa0 and float(bar.volume) > self.volumeFast and self.volumeFast > self.volumeSlow
+        # 32.14% 2,407.31，-3,409.74 28笔  开仓：19 ,加仓：9 ,止盈: 4 ,止损: 14
+        #crossOver = self.fastMa0 > self.slowMa0 and self.fastMa1 < self.slowMa1 and bar.volume > self.volumeFast and self.volumeFast > self.volumeSlow
+        crossDown = self.fastMa0 < self.slowMa0 and self.fastMa1 > self.slowMa1 and bar.close < self.fastMa0 and float(bar.volume) < self.volumeFast and self.volumeFast < self.volumeSlow
+
+        # 开仓
+        if crossOver:
+            # 如果金叉时手头没有持仓，则直接做多
+            if self.pos == 0:
+                orderID = self.buy(bar.close, 1)
+                self.orderList.append(orderID)
+                self.lastOrderType = 'K'
+
         if len(self.orderList) == 0:
             if abs(self.pos) < self.maxHoldPos and abs(self.pos) > 0:
                 if self.posDirection == 'D' and self.pos > 0:
@@ -231,48 +273,11 @@ class CtyEmaDemoStrategy(CtaTemplate):
                     orderID = self.sell(bar.close, abs(self.pos))
                     self.orderList.append(orderID)
                     self.lastOrderType = 'Z'
-        self.closeHistory.append(float(bar.close))
-        self.bidVolumeHistory.append(float(bar.volume))
-        if len(self.closeHistory) < self.minHistroy:
-            return
-        if len(self.closeHistory) > self.maxHistroy:
-            self.closeHistory.pop(0)
-            self.bidVolumeHistory.pop(0)
-
-        closeArray = np.array(self.closeHistory)
-        volumeArray = np.array(self.bidVolumeHistory)
-        # 计算快慢均线
-        fastSMA = ta.SMA(closeArray, self.fastK)
-        slowSMA = ta.SMA(closeArray, self.fastK*self.slowKRate)
-        offsetSMA = ta.SMA(closeArray, self.fastK*self.offsetRate)
-
-        self.volumeFast = ta.MA(volumeArray, self.fastK)[-1]
-        self.volumeSlow = ta.MA(volumeArray, self.fastK*self.slowKRate)[-1]
-
-        self.fastMa0 = fastSMA[-1]
-        self.fastMa1 = fastSMA[-2]
-        self.slowMa0 = slowSMA[-1]
-        self.slowMa1 = slowSMA[-2]
-
-        self.offsetMa0 = offsetSMA[-1]
-        self.offsetMa1 = offsetSMA[-2]
-        # 判断买卖
-        # 37.93% 4,244.9，-3,130.81 29笔 开仓：17 ,加仓：12 ,止盈: 5 ,止损: 11  盈利了。。。加仓步长 +0.002 止盈 +0.02
-        crossOver = self.fastMa0 > self.offsetMa0 and self.fastMa1 < self.offsetMa1 and float(bar.volume) > self.volumeSlow
-        # 36% 2,813.45 	-2,885.53 25笔 开仓：15 ,加仓：10 ,止盈: 4 ,止损: 10   盈利了
-        #crossOver = self.fastMa0 > self.slowMa30t and self.fastMa1 < self.slowMa30y and bar.volume > self.volumeFast and self.volumeFast > self.volumeSlow
-        # 29% 2,050.74 -3,482.14 31笔 开仓：20 ,加仓：11 ,止盈: 4 ,止损: 15
-        #crossOver = self.fastMa0 > self.slowMa0 and self.fastMa1 < self.slowMa1 and bar.close > self.fastMa0 and bar.volume > self.volumeMa10 and self.volumeMa5 > self.volumeMa10
-        # 32.14% 2,407.31，-3,409.74 28笔  开仓：19 ,加仓：9 ,止盈: 4 ,止损: 14
-        #crossOver = self.fastMa0 > self.slowMa0 and self.fastMa1 < self.slowMa1 and bar.volume > self.volumeFast and self.volumeFast > self.volumeSlow
-
-        # 开仓
-        if crossOver:
-            # 如果金叉时手头没有持仓，则直接做多
-            if self.pos == 0:
-                orderID = self.buy(bar.close, 1)
-                self.orderList.append(orderID)
-                self.lastOrderType = 'K'
+            elif crossDown:
+                if self.pos > 0:
+                    orderID = self.sell(bar.close, abs(self.pos))
+                    self.orderList.append(orderID)
+                    self.lastOrderType = 'P'
         # 止盈
         # 发出状态更新事件
         self.putEvent()
@@ -293,20 +298,20 @@ class CtyEmaDemoStrategy(CtaTemplate):
             self.isHoldPos = True
             self.lastOpenPrice = trade.price
             self.openPrice = trade.price  # 锚定开仓价
-            self.stopPrice = trade.price * (1 - 0.002)  # 设置止损价
-            self.addPrice = trade.price * (1 + 0.0025)  # 设置加仓价
+            self.stopPrice = trade.price * (1 - self.moveBase * self.offsetRate * self.margin)   # 设置止损价
+            self.addPrice = trade.price * (1 + self.moveBase * self.offsetRate * self.margin*2)  # 设置加仓价
             self.kCount += 1
             #print ("多头开仓成功  开仓价:%f , 加仓价:%f, 平仓价:%f, fast:%f ,slow:%f,  min:%s" % (self.openPrice, self.addPrice, self.stopPrice, self.fastMa0, self.slowMa0, trade.tradeTime))
         elif self.lastOrderType == 'J' and self.pos < self.maxHoldPos:
-            self.addPrice = (trade.price + self.lastOpenPrice) * 0.5 * (1 + 0.002)  # 移动加仓价
-            self.stopPrice = (trade.price + self.lastOpenPrice) * 0.5 * (1 - 0.002)  # 移动止损价
+            self.addPrice = trade.price * (1 + self.moveBase * self.margin*2)  # 移动加仓价
+            self.stopPrice = trade.price * (1 - self.moveBase * self.offsetRate * self.margin)  # 移动止损价
             self.lastOpenPrice = trade.price
             self.jCount += 1
             #print ("多头加仓成功  加仓价:%f,下一加仓价:%f, 当前平仓价:%f, min:%s" % (trade.price, self.addPrice, self.stopPrice,trade.tradeTime))
         elif self.lastOrderType == 'J' and self.pos == self.maxHoldPos:
             self.addPrice = (trade.price + self.lastOpenPrice) * 0.5 * (1 + 1.004)  # 移动加仓价
-            self.stopPrice = (trade.price + self.lastOpenPrice) * 0.5 * (1 - 0.002)  # 移动止损价
-            self.profitPrice = trade.price * (1+0.001*self.profitRate)  # 止盈价设定
+            self.stopPrice = trade.price * (1 - self.moveBase * self.offsetRate * self.margin)  # 移动止损价
+            self.profitPrice = trade.price * (1 + self.moveBase * self.profitRate * self.margin)  # 止盈价设定
             self.lastOpenPrice = trade.price
             self.jCount += 1
             #print ("多头加仓成功  加仓价:%f, 止损平仓价:%f, min:%s" % (trade.price, self.stopPrice, trade.tradeTime))
