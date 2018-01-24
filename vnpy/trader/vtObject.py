@@ -4,7 +4,7 @@ import time
 
 from vnpy.trader.vtConstant import (EMPTY_STRING, EMPTY_UNICODE, 
                                     EMPTY_FLOAT, EMPTY_INT)
-from sqlalchemy import FLOAT, Column, Integer, String, DateTime
+from sqlalchemy import FLOAT, Column, Integer, String, DateTime ,INT
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -106,9 +106,19 @@ class VtTickData(VtBaseData,Base):
 
     
 ########################################################################
-class VtBarData(VtBaseData):
+class VtBarData(VtBaseData, Base):
     """K线数据"""
-
+    __tablename__ = 'bar_data'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    symbol = Column(String(32))
+    open = Column(FLOAT(10, 4))
+    high = Column(FLOAT(10, 4))
+    low = Column(FLOAT(10, 4))
+    close = Column(FLOAT(10, 4))
+    date = Column(String(32))  # bar开始的时间，日期
+    time = Column(String(32))  # 时间
+    datetime = Column(DateTime(3))  # python的datetime时间对象
+    volume = Column(Integer)  # 成交量
     #----------------------------------------------------------------------
     def __init__(self):
         """Constructor"""
@@ -128,7 +138,7 @@ class VtBarData(VtBaseData):
         self.datetime = None                # python的datetime时间对象
         
         self.volume = EMPTY_INT             # 成交量
-        self.openInterest = EMPTY_INT       # 持仓量    
+        self.openInterest = EMPTY_INT       # 持仓量
     
 
 ########################################################################

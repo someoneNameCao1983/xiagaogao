@@ -27,7 +27,17 @@ def saveDataFrameToMysql(df, tname, clear=True):
     else:
         df.to_sql(tname, engine, if_exists='append')
     print u'插入完毕，耗时：%s' % (time() - start)
-    
+
+#查询mysql
+def loadhistroyDataMysql():
+
+    start = time()
+    engine = create_engine(globalSetting['btiUrl'])
+    semake = sessionmaker(bind=engine)
+    session = semake()
+    for instance in session.query(VtBarData).filter(VtBarData.id == 1):
+        print instance.low
+
 # 插入mysql
 def saveEntityDictToMysql(EntityDict,DbName):
     start = time()
@@ -43,6 +53,7 @@ def saveEntityDictToMysql(EntityDict,DbName):
     else:
         print '没有指定数据'
         engine = create_engine(globalSetting['mysqlUrl'])
+    #Base.metadata.create_all(engine)
     semake = sessionmaker(bind=engine)
     session = semake()
     tradeCount = 0

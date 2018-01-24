@@ -216,15 +216,15 @@ class BacktestingEngine(object):
         else:
             flt = {'datetime':{'$gte':self.strategyStartDate,
                                '$lte':self.dataEndDate}}  
-        self.dbCursor = collection.find(flt).sort('_id')
-        
+        #self.dbCursor = collection.find(flt).sort('_id')
+        self.dbCursor = collection.find(flt).sort('datetime')
         self.output(u'载入完成，数据量：%s' %(initCursor.count() + self.dbCursor.count()))
         
     #----------------------------------------------------------------------
     def runBacktesting(self):
         """运行回测"""
         # 载入历史数据
-        self.loadHistoryData()
+        #self.loadHistoryData()
         
         # 首先根据回测模式，确认要使用的数据类
         if self.mode == self.BAR_MODE:
@@ -245,12 +245,21 @@ class BacktestingEngine(object):
         self.output(u'策略启动完成')
         
         self.output(u'开始回放数据')
-
+        '''
         for d in self.dbCursor:
             data = dataClass()
             data.__dict__ = d
             func(data)
+        '''
+        engine = create_engine(globalSetting['btiUrl'])
+        semake = sessionmaker(bind=engine)
+        session = semake()
+        for instance in session.query(VtBarData).filter(VtBarData.symbol == self.symbol, VtBarData.datetime > self.strategyStartDate).order_by(VtBarData.datetime.asc()):
+            data = dataClass()
+            data.__dict__ = d
+            func(instance)
         self.strategy.onStop()
+
         self.output(u'数据回放结束')
     #----------------------------------------------------------------------
     def newBar(self, bar):
@@ -302,11 +311,13 @@ class BacktestingEngine(object):
             sellCrossPrice = self.bar.high      # 若卖出方向限价单价格低于该价格，则会成交
             buyBestCrossPrice = self.bar.open   # 在当前时间点前发出的买入委托可能的最优成交价
             sellBestCrossPrice = self.bar.open  # 在当前时间点前发出的卖出委托可能的最优成交价
+            volume = self.bar.volume
         else:
             buyCrossPrice = self.tick.askPrice1
             sellCrossPrice = self.tick.bidPrice1
             buyBestCrossPrice = self.tick.askPrice1
             sellBestCrossPrice = self.tick.bidPrice1
+            volume = self.tick.askVolume1
             '''
             buyCrossPrice = self.tick.lastPrice
             sellCrossPrice = self.tick.lastPrice
@@ -323,11 +334,13 @@ class BacktestingEngine(object):
             # 判断是否会成交
             buyCross = (order.direction==DIRECTION_LONG and 
                         order.price>=buyCrossPrice and
-                        buyCrossPrice > 0)      # 国内的tick行情在涨停时askPrice1为0，此时买无法成交
+                        buyCrossPrice > 0 and
+                        volume >=60)      # 国内的tick行情在涨停时askPrice1为0，此时买无法成交
             
             sellCross = (order.direction==DIRECTION_SHORT and 
                          order.price<=sellCrossPrice and
-                         sellCrossPrice > 0)    # 国内的tick行情在跌停时bidPrice1为0，此时卖无法成交
+                         sellCrossPrice > 0 and
+                         volume >= 60)    # 国内的tick行情在跌停时bidPrice1为0，此时卖无法成交
             
             # 如果发生了成交
             if buyCross or sellCross:
@@ -839,8 +852,8 @@ class BacktestingEngine(object):
         plt.sca(pPos)
         plt.tight_layout()
         plt.xticks(xindex, tradeTimeIndex, rotation=30)  # 旋转15
-        
         plt.show()
+        plt.savefig('temp.png')
     
     #----------------------------------------------------------------------
     def clearBacktestingResult(self):
@@ -860,7 +873,7 @@ class BacktestingEngine(object):
         self.tradeDict.clear()
         #清空回测记录
         engine = create_engine(globalSetting['btiUrl'])
-        #engine.echo = True
+        engine.echo = False
         Base.metadata.create_all(engine)
         engine.execute(text('delete from trade_data'))
         #engine.execute(text('delete from key_tick_data'))
@@ -1108,10 +1121,10 @@ class TradingResult(Base):
         
         self.volume = volume    # 交易数量（+/-代表方向）
         
-        self.turnover = (self.entryPrice+self.exitPrice)*size*abs(volume)   # 成交金额
+        self.turnover = (float(self.entryPrice)+float(self.exitPrice))*size*abs(volume)   # 成交金额
         self.commission = self.turnover*rate                                # 手续费成本
         self.slippage = slippage*2*size*abs(volume)                         # 滑点成本
-        self.pnl = ((self.exitPrice - self.entryPrice) * volume * size 
+        self.pnl = ((float(self.exitPrice) - float(self.entryPrice)) * volume * size
                     - self.commission - self.slippage)                      # 净盈亏
 
 

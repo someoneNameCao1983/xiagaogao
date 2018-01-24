@@ -18,7 +18,8 @@ from vnpy.trader.vtConstant import (EMPTY_STRING, EMPTY_UNICODE,
                                     EMPTY_FLOAT, EMPTY_INT)
 Base = declarative_base()
 
-convert2Mongo('rb18012', 'Simnow')
+#convert2Mongo('rb18012', 'Simnow')
+loadhistroyDataMysql()
 '''
 #mysql 连接
 start = time()
@@ -332,10 +333,10 @@ class TradingResult(Base):
 
 engine = create_engine(globalSetting['btiUrl'])
 Session = sessionmaker(bind=engine)
-#s = Session()
-#trade1 = TradingResult()
+s = Session()
+trade1 = TradingResult()
 #trade1.pnl = 230
 #s.add(trade1)
 #s.add(trade4)
 #Base.metadata.create_all(engine)
-##s.commit()
+#s.commit()
