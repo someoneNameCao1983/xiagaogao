@@ -108,7 +108,7 @@ class BacktestingEngine(object):
         if not self.priceTick:
             return price
         
-        newPrice = round(price/self.priceTick, 0) * self.priceTick
+        newPrice = round(float(price)/self.priceTick, 0) * self.priceTick
         return newPrice
 
     #----------------------------------------------------------------------
@@ -1283,6 +1283,8 @@ def optimize(strategyClass, setting, targetName,
     engine.runBacktesting()
     d = engine.calculateBacktestingResult()
     d['drawdown'] = round(min(d['drawdownList']),2)
+    d['profitLossRatio'] = round(d['profitLossRatio'], 2)
+    d['winningRate'] = round(d['winningRate'], 2)
     del d['tradeTimeList']
     del d['drawdownList']
     del d['posList']
@@ -1290,10 +1292,10 @@ def optimize(strategyClass, setting, targetName,
     del d['timeList']
     del d['capitalList']
     del d['totalTurnover']
-    del d['profitLossRatio']
+    #del d['profitLossRatio']
     del d['averageLosing']
     del d['averageWinning']
-    del d['winningRate']
+    #del d['winningRate']
     try:
         targetValue = d
     except KeyError:

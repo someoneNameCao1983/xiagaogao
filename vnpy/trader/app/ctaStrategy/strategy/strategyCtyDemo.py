@@ -20,6 +20,7 @@ from vnpy.cty.tools import *
 from datetime import datetime, time
 import numpy as np
 import talib as ta
+import math
 
 ########################################################################
 class CtyEmaDemoStrategy(CtaTemplate):
@@ -51,9 +52,12 @@ class CtyEmaDemoStrategy(CtaTemplate):
     fastHistory = []
     slowHistory = []
     bidVolumeHistory = []           # 买量
+    posMa = []   # 开仓后均线
+    holdTimes = 0   # 持仓时间
 
-    minHistroy = 11  # 最少缓存11根开始计算
-    maxHistroy = 80  # 最多缓存60根
+
+    minHistroy = 120  # 最少缓存11根开始计算
+    maxHistroy = 130  # 最多缓存60根
 
     fastMa0 = EMPTY_FLOAT   # 当前最新的快速EMA
     fastMa1 = EMPTY_FLOAT   # 上一根的快速EMA
@@ -69,13 +73,17 @@ class CtyEmaDemoStrategy(CtaTemplate):
     stopPrice = EMPTY_FLOAT  # 固定止损价
     pipStopPrice = EMPTY_FLOAT  # 通道止损价
     addPrice = EMPTY_FLOAT  # 加仓价
-    rang = EMPTY_FLOAT      # 震荡范围
+    lastTAR = EMPTY_FLOAT      # 震荡范围
+    preTAR = EMPTY_FLOAT      # 震荡范围
     profitPrice = EMPTY_FLOAT  # 止盈价
 
     isHoldPos = False        # 持仓标识
     posDirection = None   # 持仓方向
     lastOrderType = 'None'  # 最近一次下单动作 K开仓 J加仓 P平仓 Z 止盈
     orderList = []                      # 保存委托代码的列表
+    bigjj = 30
+    smalljj = 10
+    stopjj = 3
 
     #策略参数
     kCount = 0  # 开仓次数
@@ -93,6 +101,9 @@ class CtyEmaDemoStrategy(CtaTemplate):
                  'offsetRate',
                  'addRate',
                  'maxHoldPos',
+                 'bigjj',
+                 'smalljj',
+                 'stopjj',
                  'margin']
     
     # 变量列表，保存了变量的名称
@@ -120,6 +131,7 @@ class CtyEmaDemoStrategy(CtaTemplate):
         self.fastHistory = []
         self.slowHistory = []
         self.bidVolumeHistory = []
+        self.posMa = []
         #----------------------------------------------------------------------
     def __del__(self, ctaEngine, setting):
         """析构函数"""
@@ -257,6 +269,7 @@ class CtyEmaDemoStrategy(CtaTemplate):
         if not isValidate:
             return
         self.bar = bar
+        '''准备数据'''
         self.closeHistory.append(float(bar.close))
         self.lowHistory.append(float(bar.low))
         self.highHistory.append(float(bar.high))
@@ -274,64 +287,90 @@ class CtyEmaDemoStrategy(CtaTemplate):
         lowArray = np.array(self.lowHistory)
         highArray = np.array(self.highHistory)
         volumeArray = np.array(self.bidVolumeHistory)
-        slowMax = ta.MAX(closeArray, timeperiod=self.slowK)[-1]
+
         # 计算快慢均线
         fastSMA = ta.SMA(closeArray, timeperiod=self.fastK)
         slowSMA = ta.SMA(closeArray, timeperiod=self.slowK)
-        #if len(closeArray)<>len(lowArray) or  len(closeArray)<>len(highArray):
-        #    print 'dif'
-        self.rang = ta.ATR(highArray, lowArray, closeArray, timeperiod=self.fastK)[-1]
-        self.volumeFast = ta.SMA(volumeArray, timeperiod=self.fastK)[-1]
-        self.volumeSlow = ta.SMA(volumeArray, timeperiod=self.slowK)[-1]
+
+        # 如果有持仓重新记录均线
+        lastCyc = (self.fastK+1)*(-1)
+        preCyc = (self.fastK*2+1)*(-1)
+        lastCycMax = ta.MAX(slowSMA[lastCyc:-1], timeperiod=self.fastK)[-1]
+        preCycMax = ta.MAX(slowSMA[preCyc:lastCyc], timeperiod=self.fastK)[-1]
+        lastCycMin = ta.MIN(slowSMA[lastCyc:-1], timeperiod=self.fastK)[-1]
+        preCycMin = ta.MIN(slowSMA[preCyc:lastCyc], timeperiod=self.fastK)[-1]
+
+        self.lastTAR = ta.ATR(highArray[lastCyc:-1], lowArray[lastCyc:-1], closeArray[lastCyc:-1])[-1]
+        self.preTAR = ta.ATR(highArray[preCyc:lastCyc], lowArray[preCyc:lastCyc], closeArray[preCyc:lastCyc])[-1]
 
         self.fastMa0 = fastSMA[-1]
         self.fastMa1 = fastSMA[-2]
         self.slowMa0 = slowSMA[-1]
         self.slowMa1 = slowSMA[-2]
-        # 阴阳
-        upBar = bar.high > bar.close and bar.close > bar.low
+        '''生成指标'''
+
         # 上涨趋势
         upQ = closeArray[-1] > closeArray[-2]
-        # 不是跳空高开
-        upRate = (float(bar.open) - closeArray[-2])
 
-        jU = upRate < 5
-        upV = volumeArray[-1] > volumeArray[-2]
-        preDiff = self.slowMa1 - self.fastMa1
+        preDiff = self.fastMa1 - self.slowMa1
         curDiff = self.fastMa0 - self.slowMa0
-        # 判断买卖
-        # 37.93% 4,244.9，-3,130.81 29笔 开仓：17 ,加仓：12 ,止盈: 5 ,止损: 11  盈利了。。。加仓步长 +0.002 止盈 +0.02
-        crossOver = (self.fastMa0 > self.fastMa1
-                    and self.fastMa0 > self.slowMa0
-                    and self.fastMa1 < self.slowMa1
-                    and self.slowMa0 > self.slowMa1
-                    and bar.high >= slowMax
-                    #and preDiff > 0
-                    #and bar.volume > 200
-                    #and bar.open < (bar.high - 2)
-                    #and jU
-                    #and upQ
-                     )
+        '''生成开仓，平仓，加仓，止损移动标志位'''
+        if self.slowMa0 > self.slowMa1 and self.fastMa0 > self.fastMa1:
+            # 斜率
+            fastk1 = 1 / (self.fastMa0 - fastSMA[-2])
+            # fastk2 = 1 / (self.fastMa1 - fastSMA[-3])
+            slwok1 = 1 / (self.slowMa0 - slowSMA[-2])
+            # slwok2 = 1 / (self.slowMa1 - slowSMA[-3])
+            # 正切值
+            # f2ftanx = abs((fastk1 - fastk2)/(1 + fastk1 * fastk2))
+            # s2stanx = abs((slwok1 - slwok2)/(1 + slwok1 * slwok2))
+            f2stanx = abs((slwok1 - fastk1)/(1 + slwok1 * fastk1))
+            # 反正切求夹角
+            # f2fjj = round(math.atan(f2ftanx) * 180 / math.pi, 2)
+            # s2sjj = round(math.atan(s2stanx) * 180 / math.pi, 2)
+            f2sjj = round(math.atan(f2stanx) * 180 / math.pi, 2)
 
-        #crossDown = self.fastMa0 < self.slowMa0 and self.fastMa1 > self.slowMa1 and bar.close < self.fastMa0
-        #下穿
-        #crossDown = self.fastMa0 < self.slowMa0 and self.fastMa1 > self.fastMa0
-        #三连绿
-        #tGreen = closeArray[-1] < closeArray[-2] and closeArray[-2] < closeArray[-3] and closeArray[-3] < closeArray[-4]
+            openFlag = (f2sjj > self.smalljj and f2sjj < self.bigjj and fastk1 > slwok1
+                        and self.lastTAR > self.preTAR
+                        and lastCycMax > preCycMax and lastCycMin > preCycMin
+                        )
+        else:
+            openFlag = False
+        if self.pos > 0:
+            if self.fastMa0 == self.fastMa1 and self.slowMa0 != self.slowMa1:
+                slwok1 = 1 / (self.slowMa0 - slowSMA[-2])
+                f2sjj = round(math.atan(slwok1) * 180 / math.pi, 2)
+            elif self.slowMa0 == self.slowMa1 and self.fastMa0 != self.fastMa1:
+                fastk1 = 1 / (self.fastMa0 - fastSMA[-2])
+                f2sjj = round(math.atan(fastk1) * 180 / math.pi, 2)
+            elif self.slowMa0 == self.slowMa1 and self.fastMa0 == self.fastMa1:
+                f2sjj = 0
+            else:
+                # 斜率
+                fastk1 = 1 / (self.fastMa0 - fastSMA[-2])
+                slwok1 = 1 / (self.slowMa0 - slowSMA[-2])
+                f2stanx = abs((slwok1 - fastk1) / (1 + slwok1 * fastk1))
+                f2sjj = round(math.atan(f2stanx) * 180 / math.pi, 2)
+            closeFlag = bar.close < self.stopPrice and (f2sjj < self.stopjj)
+            '''
+            closeFlag = (bar.close < self.stopPrice or
+                         (lastCycMax < preCycMax and lastCycMin < preCycMin and
+                            self.fastMa0 < self.fastMa1)
+                         )
+            '''
+            moveUpPriceFlag = bar.close > self.profitPrice or self.fastMa0 > self.profitPrice
+        else:
+            closeFlag = False
+            moveUpPriceFlag = False
 
         # 开仓
         if len(self.orderList) == 0:
-            if crossOver:
-                # 如果金叉时手头没有持仓，则直接做多
-                if self.pos == 0:
-                    orderID = self.buy(bar.close, 1)
-                    self.orderList.append(orderID)
-                    self.lastOrderType = 'K'
-                elif abs(self.pos) < self.maxHoldPos and abs(self.pos) > 0:
-                    orderID = self.buy(bar.close, 1)
-                    self.orderList.append(orderID)
-                    self.lastOrderType = 'J'
-                    #print ("1多头下加仓单 开仓价:%f,加仓价%f,min:%s" % (self.openPrice, bar.close, bar.datetime.strftime('%H:%M:%S')))
+            # 开仓
+            if openFlag and self.pos < self.maxHoldPos:
+                orderID = self.buy(bar.close, 1)
+                self.orderList.append(orderID)
+                self.lastOrderType = 'K'
+                #print ("多头开仓 f2s夹角:%f,开仓价:%f,min:%s" % (f2sjj, bar.close, bar.datetime.strftime('%H:%M:%S')))
             '''
             if abs(self.pos) < self.maxHoldPos and abs(self.pos) > 0 :
                 if self.posDirection == 'D' and self.pos > 0:
@@ -347,33 +386,18 @@ class CtyEmaDemoStrategy(CtaTemplate):
                         #print ("2多头下加仓单 开仓价:%f,加仓价%f,min:%s" % (self.openPrice, bar.close, bar.datetime.strftime('%H:%M:%S')))
             '''
             # 平仓
-            if abs(self.pos) > 0:
-                self.pipStopPrice = closeArray[-2] - self.rang*1.5  # 设置止损价
-                if bar.close < self.stopPrice:
-                    if fastSMA[-1] < slowSMA[-1] + self.rang:
-                        orderID = self.sell(bar.close, abs(self.pos))
-                        self.orderList.append(orderID)
-                        self.lastOrderType = 'P'
-                        print ("1多头下平仓单 开仓价:%f,平仓价%f,min:%s, pos:%d" % (self.openPrice, bar.close, bar.datetime.strftime('%H:%M:%S'), self.pos))
-                elif self.fastMa0 - self.slowMa0 > 4*self.rang:
-                    orderID = self.sell(bar.close, abs(self.pos))
-                    self.orderList.append(orderID)
-                    self.lastOrderType = 'P'
-                    #print ("4多头下平仓单 开仓价:%f,平仓价%f,min:%s, pos:%d" % (
-#                    self.openPrice, bar.close, bar.datetime.strftime('%H:%M:%S'), self.pos))
-                elif bar.close > self.profitPrice:
-                    if self.pos > 0:
-                        self.stopPrice = self.profitPrice
-                        self.profitPrice = self.profitPrice + 1*self.rang
-                        #orderID = self.sell(bar.close, abs(self.pos))
-                        #self.orderList.append(orderID)
-                        #self.lastOrderType = 'Z'
-                        #print ("2多头下平仓单 开仓价:%f,平仓价%f,min:%s, pos:%d" % (self.openPrice, bar.close, bar.datetime.strftime('%H:%M:%S'), self.pos))
-                elif bar.low < self.pipStopPrice:
-                    orderID = self.sell(bar.close, abs(self.pos))
-                    self.orderList.append(orderID)
-                    self.lastOrderType = 'P'
-                    #print ("2多头下平仓单 开仓价:%f,平仓价%f,min:%s, pos:%d" % (self.openPrice, self.pipStopPrice, bar.datetime.strftime('%H:%M:%S'), self.pos))
+            if abs(self.pos) > 0 and closeFlag and not openFlag:
+                orderID = self.sell(bar.close, abs(self.pos))
+                self.orderList.append(orderID)
+                self.lastOrderType = 'P'
+                # print ("1多头下平仓单 开仓价:%f,平仓价%f,min:%s, pos:%d" % (self.openPrice, bar.close, bar.datetime.strftime('%H:%M:%S'), self.pos))
+            # 移动止损，止盈
+            if moveUpPriceFlag:
+                self.stopPrice = self.stopPrice + 4*self.lastTAR
+                self.profitPrice = self.profitPrice + 4*self.lastTAR
+        # 有持仓的日常维护
+            if self.pos > 0:
+                self.pipStopPrice = closeArray[-2] - self.lastTAR * 1.5  # 设置止损价
         # 止盈
         # 发出状态更新事件
         self.putEvent()
@@ -395,11 +419,11 @@ class CtyEmaDemoStrategy(CtaTemplate):
             self.lastOpenPrice = float(trade.price)
             self.openPrice = float(trade.price)  # 锚定开仓价
             #self.stopPrice = float(trade.price) * (1 - self.moveBase * self.offsetRate * self.margin)   # 设置止损价
-            self.pipStopPrice = float(trade.price) - self.rang * 1.5  # 设置止损价
-            self.stopPrice = float(trade.price) - self.rang  # 设置止损价
+            self.pipStopPrice = float(trade.price) - self.lastTAR * 1.5  # 设置止损价
+            self.stopPrice = float(trade.price) - self.lastTAR * 3  # 设置止损价
             self.addPrice = float(trade.price) * (1 + self.moveBase * self.margin * self.addRate)  # 设置加仓价
             self.kCount += 1
-            self.profitPrice = float(trade.price) + self.rang*4  # 止盈价设定
+            self.profitPrice = float(trade.price) + self.lastTAR * 4  # 止盈价设定
             #print ("多头开仓成功  开仓价:%f , 加仓价:%f, 平仓价:%f, fast:%f ,slow:%f,  min:%s" % (self.openPrice, self.addPrice, self.stopPrice, self.fastMa0, self.slowMa0, trade.tradeTime))
         elif self.lastOrderType == 'J' and self.pos < self.maxHoldPos:
             self.addPrice = float(trade.price) * (1 + self.moveBase * self.margin * self.addRate)  # 移动加仓价
@@ -438,6 +462,7 @@ class CtyEmaDemoStrategy(CtaTemplate):
             self.pCount += 1
             self.lastOpenPrice = EMPTY_FLOAT
             self.lastOrderType = 'None'
+            self.posMa = []
         elif self.lastOrderType == 'Z':
             self.zCount += 1
             #print ("多头止盈成功 开仓价:%f,平仓价%f,min:%s, pos:%d" % (self.openPrice, trade.price, trade.tradeTime, trade.volume))
@@ -449,6 +474,7 @@ class CtyEmaDemoStrategy(CtaTemplate):
             self.lastOpenPrice = EMPTY_FLOAT
             self.isHoldPos = False
             self.lastOrderType = 'None'
+            self.posMa = []
         pass
 
     #----------------------------------------------------------------------

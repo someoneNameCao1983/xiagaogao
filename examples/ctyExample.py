@@ -10,6 +10,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import *
 from time import time
 from sqlalchemy import *
+import talib as ta
+import math
 import sys
 import math
 import pymongo
@@ -19,7 +21,18 @@ from vnpy.trader.vtConstant import (EMPTY_STRING, EMPTY_UNICODE,
 Base = declarative_base()
 
 #convert2Mongo('rb18012', 'Simnow')
-loadhistroyDataMysql()
+#loadhistroyDataMysql()
+a = [1,2,3,4,5,6,7,8,9,10]
+print a
+b = a[-7:-4]
+print b
+c = a[-4:-1]
+print c
+a1 = 4255
+a2 = 4259
+sin = math.atan(-0.140187)*180/math.pi
+
+print sin
 '''
 #mysql 连接
 start = time()
