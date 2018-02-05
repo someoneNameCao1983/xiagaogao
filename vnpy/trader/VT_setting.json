@@ -12,6 +12,7 @@
 
 	"mysqlUrl":"mysql://root:123@116.196.118.219:3306/vnpy?charset=utf8",
 	"quoteUrl":"mysql://root:123@116.196.118.219:3306/quote?charset=utf8",
-	"btiUrl":"mysql://root:123@116.196.118.219:3306/bti?charset=utf8",
-	"simnowUrl":"mysql://root:123@116.196.118.219:3306/simnow?charset=utf8"
+	"btiUrl":"mysql://root:1234@localhost:3309/bti?charset=utf8",
+	"simnowUrl":"mysql://root:123@116.196.118.219:3306/simnow?charset=utf8",
+	"dssUrl":"mysql://root:kiiik@192.168.16.253:3306/test?charset=utf8"
 }

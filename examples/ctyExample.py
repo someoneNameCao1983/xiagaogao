@@ -31,8 +31,16 @@ print c
 a1 = 4255
 a2 = 4259
 sin = math.atan(-0.140187)*180/math.pi
+k1 = 1
+k2 = 0.5
 
-print sin
+k11 = 1
+k21 = 2
+
+tanx = (k2-k1)/(1+k2*k1)
+tanx1 = float(k2-k1)/float(1+k2*k1)
+print tanx
+print '%f' % tanx1
 '''
 #mysql 连接
 start = time()

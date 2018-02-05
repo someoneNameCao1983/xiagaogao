@@ -254,6 +254,7 @@ class BacktestingEngine(object):
         engine = create_engine(globalSetting['btiUrl'])
         semake = sessionmaker(bind=engine)
         session = semake()
+        engine.echo = False
         for instance in session.query(VtBarData).filter(VtBarData.symbol == self.symbol, VtBarData.datetime > self.strategyStartDate).order_by(VtBarData.datetime.asc()):
             data = dataClass()
             data.__dict__ = d
@@ -334,13 +335,15 @@ class BacktestingEngine(object):
             # 判断是否会成交
             buyCross = (order.direction==DIRECTION_LONG and 
                         order.price>=buyCrossPrice and
-                        buyCrossPrice > 0 and
-                        volume >=60)      # 国内的tick行情在涨停时askPrice1为0，此时买无法成交
+                        buyCrossPrice > 0
+                        #and volume >=60
+                        )      # 国内的tick行情在涨停时askPrice1为0，此时买无法成交
             
             sellCross = (order.direction==DIRECTION_SHORT and 
                          order.price<=sellCrossPrice and
-                         sellCrossPrice > 0 and
-                         volume >= 60)    # 国内的tick行情在跌停时bidPrice1为0，此时卖无法成交
+                         sellCrossPrice > 0
+                         #and volume >= 60
+                         )    # 国内的tick行情在跌停时bidPrice1为0，此时卖无法成交
             
             # 如果发生了成交
             if buyCross or sellCross:
@@ -814,12 +817,13 @@ class BacktestingEngine(object):
         
         self.output(u'总交易次数：\t%s' % formatNumber(d['totalResult']))        
         self.output(u'总盈亏：\t%s' % formatNumber(d['capital']))
-        self.output(u'最大回撤: \t%s' % formatNumber(min(d['drawdownList'])))                
-        
+        self.output(u'最大回撤: \t%s' % formatNumber(min(d['drawdownList'])))
+        if d['maxCapital'] > 0:
+            self.output(u'回撤率: \t%s%%' % formatNumber((min(d['drawdownList'])/d['maxCapital'])*100))
         self.output(u'平均每笔盈利：\t%s' %formatNumber(d['capital']/d['totalResult']))
         self.output(u'平均每笔滑点：\t%s' %formatNumber(d['totalSlippage']/d['totalResult']))
         self.output(u'平均每笔佣金：\t%s' %formatNumber(d['totalCommission']/d['totalResult']))
-        
+        self.output(u'佣金：\t%s' % formatNumber(d['totalCommission']))
         self.output(u'胜率\t\t%s%%' %formatNumber(d['winningRate']))
         self.output(u'盈利交易平均值\t%s' %formatNumber(d['averageWinning']))
         self.output(u'亏损交易平均值\t%s' %formatNumber(d['averageLosing']))
@@ -930,11 +934,13 @@ class BacktestingEngine(object):
         l = []
 
         for setting in settingList:
-            l.append(pool.apply_async(optimize, (strategyClass, setting,
-                                                 targetName, self.mode, 
-                                                 self.startDate, self.initDays, self.endDate,
-                                                 self.slippage, self.rate, self.size, self.priceTick,
-                                                 self.dbName, self.symbol)))
+            re = pool.apply_async(optimize, (strategyClass, setting,
+                                            targetName, self.mode,
+                                            self.startDate, self.initDays, self.endDate,
+                                            self.slippage, self.rate, self.size, self.priceTick,
+                                            self.dbName, self.symbol))
+            if (re.get()) > 0:
+                l.append(re)
         pool.close()
         pool.join()
         
@@ -1282,20 +1288,28 @@ def optimize(strategyClass, setting, targetName,
     engine.initStrategy(strategyClass, setting)
     engine.runBacktesting()
     d = engine.calculateBacktestingResult()
-    d['drawdown'] = round(min(d['drawdownList']),2)
-    d['profitLossRatio'] = round(d['profitLossRatio'], 2)
-    d['winningRate'] = round(d['winningRate'], 2)
-    del d['tradeTimeList']
-    del d['drawdownList']
-    del d['posList']
-    del d['pnlList']
-    del d['timeList']
-    del d['capitalList']
-    del d['totalTurnover']
-    #del d['profitLossRatio']
-    del d['averageLosing']
-    del d['averageWinning']
-    #del d['winningRate']
+    if len(d) > 0:
+        d['MaxDD'] = round(min(d['drawdownList']),2)
+        d['p/L Ratio'] = round(d['profitLossRatio'], 2)
+        d['winRate'] = round(d['winningRate'], 2)
+        if d['maxCapital'] > 0:
+            d['DDRate'] = round(d['MaxDD']/d['maxCapital']*100, 4)
+        del d['tradeTimeList']
+        del d['drawdownList']
+        del d['posList']
+        del d['pnlList']
+        del d['timeList']
+        del d['capitalList']
+        del d['totalTurnover']
+        del d['profitLossRatio']
+        del d['averageLosing']
+        del d['averageWinning']
+        del d['totalCommission']
+        del d['totalSlippage']
+        del d['winningRate']
+        del d['drawdown']
+    else:
+        return (str(setting), 0)
     try:
         targetValue = d
     except KeyError:
