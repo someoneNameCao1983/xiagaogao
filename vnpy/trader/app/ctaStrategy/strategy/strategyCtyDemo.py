@@ -62,6 +62,7 @@ class CtyEmaDemoStrategy(CtaTemplate):
     smalljj = 10                  # 开仓夹角最小值
     stopjj = 5                    # 平仓夹角最大值
     f2sjj = 0                     # 快慢均线夹角
+    priceTick = 1                 # 合约最小变动价位
     kCount = 0                    # 开仓次数
     jCount = 0                    # 加仓次数
     # 参数列表，保存了参数的名称
@@ -74,6 +75,7 @@ class CtyEmaDemoStrategy(CtaTemplate):
                  'maxHoldPos',
                  'bigjj',
                  'smalljj',
+                 'priceTick',
                  'stopjj']
     
     # 变量列表，保存了变量的名称
@@ -109,47 +111,18 @@ class CtyEmaDemoStrategy(CtaTemplate):
     #----------------------------------------------------------------------
     def onInit(self):
         """初始化策略（必须由用户继承实现）"""
-        self.writeCtaLog(u'双EMA演示策略初始化')
-
+        self.writeCtaLog(u'初始化')
         #initData = self.loadBar(self.initDays)
         #for tick in initData:
         #    self.onTick(tick)
-        #for bar in initData:
-        #    self.onBar(bar)
-
+        self.closeHistory = []  # 缓存最新价的数组
+        self.lowHistory = []  # 缓存最低价的数组
+        self.highHistory = []  # 缓存最低价的数组
+        self.fastHistory = []
+        self.slowHistory = []
+        self.holdTimes = []
+        self.orderList = []
         self.putEvent()
-
-    # ----------------------------------------------------------------------
-    def validate(self, bar):
-        """数据检验"""
-        DAY_START1 = time(9, 01)  # 日盘启动和停止时间
-        DAY_END1 = time(10, 14)
-        DAY_START2 = time(10, 31)  # 日盘启动和停止时间
-        DAY_END2 = time(11, 29)
-        DAY_START3 = time(13, 31)  # 日盘启动和停止时间
-        DAY_END3 = time(14, 59)
-
-        NIGHT_START = time(21, 01)  # 夜盘启动和停止时间
-        NIGHT_END = time(23, 29)
-
-        quoteH = bar.datetime.strftime('%H')
-        quoteMin = bar.datetime.strftime('%M')
-
-        bartime = time(int(quoteH), int(quoteMin))
-        if self.bar:
-            lastbartime = time(int(self.bar.datetime.strftime('%H')), int(self.bar.datetime.strftime('%M')))
-            secondDiff = (bar.datetime - self.bar.datetime).seconds
-            #if secondDiff > 960:
-            #    print ('非序列的数据 %s' % secondDiff)
-        if ((bartime >= DAY_START1 and bartime <= DAY_END1) or
-                (bartime >= DAY_START2 and bartime <= DAY_END2) or
-                (bartime >= DAY_START3 and bartime <= DAY_END3) or
-                (bartime >= NIGHT_START) and(bartime <= NIGHT_END)):
-            #if bar.volume > 150:
-            return True
-        else:
-            #print ('非交易时间的数据 %s' % bar.datetime)
-            return False
     #----------------------------------------------------------------------
     def onStart(self):
         """启动策略（必须由用户继承实现）"""
@@ -204,11 +177,22 @@ class CtyEmaDemoStrategy(CtaTemplate):
     #----------------------------------------------------------------------
     def onBar(self, bar):
         """收到Bar推送（必须由用户继承实现）"""
+        if self.bar and self.bar.date != bar.date:
+            self.newDay(bar)
         for orderID in self.orderList:
             self.cancelOrder(orderID)
             self.orderList = []
-        isValidate = self.validate(bar)
-        if not isValidate:
+        if bar.symbol == 'NI' and validateNI(bar):
+            pass
+        elif (bar.symbol == 'RB' or bar.symbol == 'RB0000') and validateRB(bar):
+            pass
+        elif bar.symbol == 'J' and validateJ(bar):
+            pass
+        elif bar.symbol == 'MA' and validateMA(bar):
+            pass
+        elif bar.symbol == 'IF0000' and validateIF(bar):
+            pass
+        else:
             return
         self.bar = bar
         '''准备数据'''
@@ -258,8 +242,8 @@ class CtyEmaDemoStrategy(CtaTemplate):
             #f2stanx = abs(float(slowk1 - fastk1)/float(1 + slowk1 * fastk1))
             self.f2sjj = abs(fastjj - slowjj)
             openFlag = (self.f2sjj > self.smalljj and self.f2sjj < self.bigjj and fastk1 <= slowk1
-                        and self.lastTAR > self.preTAR and
-                        self.lastTAR < 10 # 均线失效
+                        and self.lastTAR > self.preTAR
+                        and self.lastTAR < (float(bar.close)*0.0035) # 均线失效
                         and lastCycMax > preCycMax and lastCycMin > preCycMin
                         )
             if openFlag:
@@ -274,34 +258,26 @@ class CtyEmaDemoStrategy(CtaTemplate):
         else:
             openFlag = False
         # 平仓标识
-        if self.pos > 0 and bar.close < self.stopPrice:
-
-            if self.slowMa0 == self.slowMa1 or self.fastMa0 == self.fastMa1:
-                self.f2sjj = 0
-                closeFlag = False
-            else:
-                # fast斜率
-                fastk1 = (self.fastMa0 - fastSMA[-2])/1
-                fastk2 = (self.fastMa1 - fastSMA[-3])/1
-                f12xjj = round(math.atan(abs(fastk1)) * 180 / math.pi, 2)
-                f22xjj = round(math.atan(abs(fastk2)) * 180 / math.pi, 2)
-                #closeFlag = abs(f12xjj-f22xjj) > self.stopjj and fastk1 < 0 and fastk1 < fastk2
-                # slow
-                slowk1 = (self.slowMa0 - slowSMA[-2]) / 1
-                slowk2 = (self.slowMa1 - slowSMA[-3]) / 1
-                s12xjj = round(math.atan(abs(slowk1)) * 180 / math.pi, 2)
-                s22xjj = round(math.atan(abs(slowk2)) * 180 / math.pi, 2)
-                closeFlag = (f12xjj < f22xjj and fastk1 < 0 and fastk2 < 0)
-                #closeFlag = (abs(s12xjj - s22xjj) > self.stopjj and slowk1 < 0 and slowk2 < 0)
-                #closeFlag = ((abs(s12xjj - s22xjj) > self.stopjj and slowk1 < 0 and slowk2 < 0) or
-                #             (abs(f12xjj - f22xjj) > self.stopjj and fastk1 < 0 and fastk2 < 0))
-
-                #if bar.close < self.slowMa0 and bar.close < self.fastMa0:
-                #   closeFlag = True
+        if self.pos > 0 and self.slowMa0 < self.slowMa1 and self.fastMa0 < self.fastMa1:
+            # 斜率
+            fastk1 = abs(self.fastMa0 - self.fastMa1) / 1
+            slowk1 = abs(self.slowMa0 - self.slowMa1) / 1
+            # 正切值
+            fastjj = round(math.atan(fastk1) * 180 / math.pi, 2)
+            slowjj = round(math.atan(slowk1) * 180 / math.pi, 2)
+            # f2stanx = abs(float(slowk1 - fastk1)/float(1 + slowk1 * fastk1))
+            self.f2sjj = abs(fastjj - slowjj)
+            closeFlag = ((fastjj > slowjj and fastjj > self.smalljj
+                        and self.lastTAR > self.preTAR
+                        and self.stopPrice > bar.close
+                        and lastCycMax < preCycMax and lastCycMin < preCycMin
+                          )
+                        #or self.lastTAR > (float(bar.close)*0.0035)
+                         )
         else:
             closeFlag = False
         #if closeFlag:
-            #print('平仓价：%f,f12xjj:%f,f22xjj:%f,close:%f' % (self.stopPrice,f12xjj,f22xjj,bar.close))
+            #print('平仓价：close:%f,振幅:%f,前振幅:%f' % (self.bar.close,self.lastTAR, self.preTAR))
         # 有持仓的日常维护
         if self.pos > 0:
             if bar.close > self.profitPrice or self.fastMa0 > self.profitPrice:
@@ -311,9 +287,7 @@ class CtyEmaDemoStrategy(CtaTemplate):
         if len(self.orderList) == 0:
             # 开仓
             if openFlag and self.pos < self.maxHoldPos:
-                orderID = self.buyCheck(bar)
-                self.orderList.append(orderID)
-                self.lastOrderType = 'K'
+                self.buyCheck(bar)
                 #print ("多头开仓 f2s夹角:%f,开仓价:%f,min:%s" % (f2sjj, bar.close, bar.datetime.strftime('%H:%M:%S')))
             # 平仓
             if abs(self.pos) > 0 and closeFlag and not openFlag:
@@ -329,15 +303,55 @@ class CtyEmaDemoStrategy(CtaTemplate):
         """收到委托变化推送（必须由用户继承实现）"""
         # 对于无需做细粒度委托控制的策略，可以忽略onOrder
         pass
-
+    #----------------------------------------------------------------------
+    def newDay(self, bar):
+        """自然日切换"""
+        # 主力合约切换日，重新缓存
+        niDay = ['2016/08/03', '2016/11/30', '2017/04/05', '2017/08/07']
+        rbDay = ['2016/8/17', '2016/11/28', '2017/3/22', '2017/8/7']
+        jDay = ['2016/8/15', '2016/12/1', '2017/3/30', '2017/8/2']
+        maDay = ['2016/8/9', '2016/12/1', '2017/4/7', '2017/8/4']
+        if bar.symbol == 'NI' and bar.date in niDay:
+            self.onInit()
+            self.output(u'NI自然日切换:'+bar.date)
+        elif bar.symbol == 'RB' and bar.date in rbDay:
+            self.onInit()
+            self.output(u'RB自然日切换:' + bar.date)
+        elif bar.symbol == 'J' and bar.date in jDay:
+            self.onInit()
+            self.output(u'J自然日切换:' + bar.date)
+        elif bar.symbol == 'MA' and bar.date in maDay:
+            self.onInit()
+            self.output(u'MA自然日切换:' + bar.date)
     # ----------------------------------------------------------------------
     def buyCheck(self, bar):
-        """买开"""
-        holiday = ['2017/1/26','2017/2/3','2017/9/29','2017/5/31','2017/5/26']
+        """特殊交易日只平仓，不开仓"""
+        holiday = ['2015/2/13','2015/4/3','2015/4/30','2015/6/19','2015/9/2','2015/9/25','2015/12/31',
+                   '2016/2/5','2016/3/29','2016/4/29','2016/6/8','2016/9/14','2016/9/30','2016/12/30',
+                   '2017/1/26','2017/2/3','2017/3/31','2017/4/28','2017/5/26,','2017/9/29','2017/12/29']
+        #最后交易日
+        niDay = ['2016/8/3', '2016/11/29', '2017/3/31', '2017/8/4']
+        rbDay = ['2016/8/16', '2016/11/25', '2017/3/21', '2017/8/4']
+        jDay = ['2016/8/12', '2016/11/30', '2017/3/29', '2017/8/1']
+        maDay = ['2016/8/8', '2016/11/30', '2017/4/6', '2017/8/3']
         if bar.date in holiday:
-            print bar.date
-            return
-        return self.buy(bar.close, 1)
+            isHoliday = True
+        elif bar.symbol == 'NI' and bar.date in niDay:
+            isHoliday = True
+        elif bar.symbol == 'RB' and bar.date in rbDay:
+            isHoliday = True
+        elif bar.symbol == 'J' and bar.date in jDay:
+            isHoliday = True
+        elif bar.symbol == 'MA' and bar.date in maDay:
+            isHoliday = True
+        else:
+            isHoliday = False
+        if isHoliday:
+            self.output('before holiday'+bar.date)
+        else:
+            orderID = self.buy(bar.close, 1)
+            self.orderList.append(orderID)
+            self.lastOrderType = 'K'
 
     #----------------------------------------------------------------------
     def onTrade(self, trade):
@@ -364,3 +378,7 @@ class CtyEmaDemoStrategy(CtaTemplate):
     def onStopOrder(self, so):
         """停止单推送"""
         pass
+
+    def output(self, content):
+        """输出内容"""
+        print str(datetime.now()) + "\t" + content

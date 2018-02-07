@@ -8,6 +8,7 @@ from vnpy.trader.vtObject import *
 from vnpy.trader.vtGlobal import globalSetting
 from sqlalchemy.orm import sessionmaker
 from time import time
+from datetime import  time as dt
 from datetime import datetime, timedelta
 import pymongo
 import copy
@@ -184,3 +185,130 @@ def roundPrice(price):
     else:
         newPrice = price
     return newPrice
+# ----------------------------------------------------------------------
+def validateNI(bar):
+    """数据检验"""
+    DAY_START1 = dt(9, 00)  # 日盘启动和停止时间
+    DAY_END1 = dt(10, 14)
+    DAY_START2 = dt(10, 30)  # 日盘启动和停止时间
+    DAY_END2 = dt(11, 29)
+    DAY_START3 = dt(13, 30)  # 日盘启动和停止时间
+    DAY_END3 = dt(14, 59)
+
+    NIGHT_START = dt(21, 00)  # 夜盘启动和停止时间
+    NIGHT_END = dt(23, 59)
+
+    NIGHT_START2 = dt(00, 00)  # 夜盘启动和停止时间
+    NIGHT_END2 = dt(00, 59)
+
+    quoteH = bar.datetime.strftime('%H')
+    quoteMin = bar.datetime.strftime('%M')
+
+    bartime = dt(int(quoteH), int(quoteMin))
+    #if self.bar:
+    if ((bartime >= DAY_START1 and bartime <= DAY_END1) or
+            (bartime >= DAY_START2 and bartime <= DAY_END2) or
+            (bartime >= DAY_START3 and bartime <= DAY_END3) or
+            (bartime >= NIGHT_START) and(bartime <= NIGHT_END) or
+            (bartime >= NIGHT_START2) and (bartime <= NIGHT_END2)
+        ):
+        return True
+    else:
+        #print ('非交易时间的数据 %s' % bar.datetime)
+        return False
+
+def validateRB(bar):
+    """数据检验"""
+    DAY_START1 = dt(9, 00)  # 日盘启动和停止时间
+    DAY_END1 = dt(10, 14)
+    DAY_START2 = dt(10, 30)  # 日盘启动和停止时间
+    DAY_END2 = dt(11, 29)
+    DAY_START3 = dt(13, 30)  # 日盘启动和停止时间
+    DAY_END3 = dt(14, 59)
+
+    NIGHT_START = dt(21, 00)  # 夜盘启动和停止时间
+    NIGHT_END = dt(22, 59)
+
+    quoteH = bar.datetime.strftime('%H')
+    quoteMin = bar.datetime.strftime('%M')
+
+    bartime = dt(int(quoteH), int(quoteMin))
+
+    if ((bartime >= DAY_START1 and bartime <= DAY_END1) or
+            (bartime >= DAY_START2 and bartime <= DAY_END2) or
+            (bartime >= DAY_START3 and bartime <= DAY_END3) or
+            (bartime >= NIGHT_START) and(bartime <= NIGHT_END)
+        ):
+        return True
+    else:
+        #print ('非交易时间的数据 %s' % bar.datetime)
+        return False
+
+def validateJ(bar):
+    """数据检验"""
+    DAY_START1 = dt(9, 00)  # 日盘启动和停止时间
+    DAY_END1 = dt(10, 14)
+    DAY_START2 = dt(10, 30)  # 日盘启动和停止时间
+    DAY_END2 = dt(11, 29)
+    DAY_START3 = dt(13, 30)  # 日盘启动和停止时间
+    DAY_END3 = dt(14, 59)
+
+    NIGHT_START = dt(21, 00)  # 夜盘启动和停止时间
+    NIGHT_END = dt(23, 29)
+
+    quoteH = bar.datetime.strftime('%H')
+    quoteMin = bar.datetime.strftime('%M')
+
+    bartime = dt(int(quoteH), int(quoteMin))
+    #if self.bar:
+    if ((bartime >= DAY_START1 and bartime <= DAY_END1) or
+            (bartime >= DAY_START2 and bartime <= DAY_END2) or
+            (bartime >= DAY_START3 and bartime <= DAY_END3) or
+            (bartime >= NIGHT_START) and(bartime <= NIGHT_END)
+        ):
+        return True
+    else:
+        #print ('非交易时间的数据 %s' % bar.datetime)
+        return False
+
+def validateMA(bar):
+    """数据检验"""
+    DAY_START1 = dt(9, 00)  # 日盘启动和停止时间
+    DAY_END1 = dt(10, 14)
+    DAY_START2 = dt(10, 30)  # 日盘启动和停止时间
+    DAY_END2 = dt(11, 29)
+    DAY_START3 = dt(13, 30)  # 日盘启动和停止时间
+    DAY_END3 = dt(14, 59)
+
+    NIGHT_START = dt(21, 00)  # 夜盘启动和停止时间
+    NIGHT_END = dt(23, 29)
+
+    quoteH = bar.datetime.strftime('%H')
+    quoteMin = bar.datetime.strftime('%M')
+
+    bartime = dt(int(quoteH), int(quoteMin))
+    #if self.bar:
+    if ((bartime >= DAY_START1 and bartime <= DAY_END1) or
+            (bartime >= DAY_START2 and bartime <= DAY_END2) or
+            (bartime >= DAY_START3 and bartime <= DAY_END3) or
+            (bartime >= NIGHT_START) and(bartime <= NIGHT_END)
+        ):
+        return True
+    else:
+        #print ('非交易时间的数据 %s' % bar.datetime)
+        return False
+def validateIF(bar):
+    """数据检验"""
+    DAY_START1 = dt(9, 30)  # 日盘启动和停止时间
+    DAY_END1 = dt(11, 29)
+
+    quoteH = bar.datetime.strftime('%H')
+    quoteMin = bar.datetime.strftime('%M')
+
+    bartime = dt(int(quoteH), int(quoteMin))
+    #if self.bar:
+    if (bartime >= DAY_START1 and bartime <= DAY_END1):
+        return True
+    else:
+        #print ('非交易时间的数据 %s' % bar.datetime)
+        return False
