@@ -218,11 +218,17 @@ class CtyEmaDemoStrategy(CtaTemplate):
         # 如果有持仓重新记录均线
         lastCyc = (20+1)*(-1)
         preCyc = (20*2+1)*(-1)
+
         lastCycMax = ta.MAX(slowSMA[lastCyc:-1], timeperiod=self.fastK)[-1]
         preCycMax = ta.MAX(slowSMA[preCyc:lastCyc], timeperiod=self.fastK)[-1]
         lastCycMin = ta.MIN(slowSMA[lastCyc:-1], timeperiod=self.fastK)[-1]
         preCycMin = ta.MIN(slowSMA[preCyc:lastCyc], timeperiod=self.fastK)[-1]
-
+        '''
+        lastCycMax = ta.MAX(fastSMA[lastCyc:-1], timeperiod=6)[-1]
+        preCycMax = ta.MAX(fastSMA[preCyc:lastCyc], timeperiod=6)[-1]
+        lastCycMin = ta.MIN(fastSMA[lastCyc:-1], timeperiod=6)[-1]
+        preCycMin = ta.MIN(fastSMA[preCyc:lastCyc], timeperiod=6)[-1]
+        '''
         self.lastTAR = ta.ATR(highArray[lastCyc:-1], lowArray[lastCyc:-1], closeArray[lastCyc:-1])[-1]
         self.preTAR = ta.ATR(highArray[preCyc:lastCyc], lowArray[preCyc:lastCyc], closeArray[preCyc:lastCyc])[-1]
 
@@ -234,19 +240,25 @@ class CtyEmaDemoStrategy(CtaTemplate):
         '''生成开仓，平仓，加仓，止损移动标志位'''
         if self.slowMa0 > self.slowMa1 and self.fastMa0 > self.fastMa1:
             # 斜率
-            fastk1 = (self.fastMa0 - self.fastMa1)/1
-            slowk1 = (self.slowMa0 - self.slowMa1)/1
+            fastk1 = (self.fastMa0 / self.fastMa1 - 1)*100
+            slowk1 = (self.slowMa0 / self.slowMa1 - 1)*100
+            #slowk2 = (slowSMA[-3]-slowSMA[-4])
             # 正切值
             fastjj = round(math.atan(fastk1) * 180 / math.pi, 2)
             slowjj = round(math.atan(slowk1) * 180 / math.pi, 2)
             #f2stanx = abs(float(slowk1 - fastk1)/float(1 + slowk1 * fastk1))
-            self.f2sjj = abs(fastjj - slowjj)
-            openFlag = (self.f2sjj > self.smalljj and self.f2sjj < self.bigjj and fastk1 <= slowk1
+            self.f2sjj = abs(fastjj - slowjj)*10
+            openFlag = ( slowjj*10 > self.smalljj
+                        #and fastk1 > slowk1
+                        and slowjj*10 < self.bigjj
                         and self.lastTAR > self.preTAR
                         and self.lastTAR < (float(bar.close)*0.0035) # 均线失效
                         and lastCycMax > preCycMax and lastCycMin > preCycMin
                         )
             if openFlag:
+                qiedian = bar.datetime.strftime('%Y%m%d-%H')
+                if qiedian == '20160819-09':
+                    print qiedian
                 #print ("多头开仓 开仓价:%f,振幅:%f,前振幅:%f" % (bar.close, self.lastTAR, self.preTAR))
                 a = (self.fastMa0 - self.fastMa1)/1
                 b = (self.slowMa0 - self.slowMa1)/1
@@ -258,25 +270,32 @@ class CtyEmaDemoStrategy(CtaTemplate):
         else:
             openFlag = False
         # 平仓标识
-        if self.pos > 0 and self.slowMa0 < self.slowMa1 and self.fastMa0 < self.fastMa1:
+        #if self.pos > 0 and self.slowMa0 < self.slowMa1 and self.fastMa0 < self.fastMa1:
+        if self.pos > 0 and self.slowMa0 < self.slowMa1:
+        #if self.pos > 0 and self.slowMa0 < self.slowMa1:
+            #fastk1 = abs(self.fastMa0 - self.fastMa1) / 1
+            #slowk1 = abs(self.slowMa0 - self.slowMa1) / 1
             # 斜率
-            fastk1 = abs(self.fastMa0 - self.fastMa1) / 1
-            slowk1 = abs(self.slowMa0 - self.slowMa1) / 1
+            fastk1 = (self.fastMa1 / self.fastMa0 - 1) * 100
+            slowk1 = (self.slowMa1 / self.slowMa0 - 1) * 100
             # 正切值
             fastjj = round(math.atan(fastk1) * 180 / math.pi, 2)
             slowjj = round(math.atan(slowk1) * 180 / math.pi, 2)
             # f2stanx = abs(float(slowk1 - fastk1)/float(1 + slowk1 * fastk1))
-            self.f2sjj = abs(fastjj - slowjj)
-            closeFlag = ((fastjj > slowjj and fastjj > self.smalljj
-                        and self.lastTAR > self.preTAR
+            #self.f2sjj = abs(fastjj - slowjj)*10
+            closeFlag = (slowjj*10 > self.stopjj
+                        #and self.lastTAR > self.preTAR
                         and self.stopPrice > bar.close
-                        and lastCycMax < preCycMax and lastCycMin < preCycMin
-                          )
+                        #and lastCycMax < preCycMax
+                        #and lastCycMin < preCycMin
                         #or self.lastTAR > (float(bar.close)*0.0035)
                          )
         else:
             closeFlag = False
-        #if closeFlag:
+        if closeFlag:
+            if (self.preTAR - self.lastTAR) > 4:
+                print self.preTAR - self.lastTAR
+                closeFlag = False
             #print('平仓价：close:%f,振幅:%f,前振幅:%f' % (self.bar.close,self.lastTAR, self.preTAR))
         # 有持仓的日常维护
         if self.pos > 0:
@@ -316,7 +335,7 @@ class CtyEmaDemoStrategy(CtaTemplate):
             self.output(u'NI自然日切换:'+bar.date)
         elif bar.symbol == 'RB' and bar.date in rbDay:
             self.onInit()
-            self.output(u'RB自然日切换:' + bar.date)
+            #self.output(u'RB自然日切换:' + bar.date)
         elif bar.symbol == 'J' and bar.date in jDay:
             self.onInit()
             self.output(u'J自然日切换:' + bar.date)
@@ -346,12 +365,14 @@ class CtyEmaDemoStrategy(CtaTemplate):
             isHoliday = True
         else:
             isHoliday = False
-        if isHoliday:
-            self.output('before holiday'+bar.date)
-        else:
+        if not isHoliday:
             orderID = self.buy(bar.close, 1)
             self.orderList.append(orderID)
             self.lastOrderType = 'K'
+        # else:
+            #self.output('before holiday'+bar.date)
+
+
 
     #----------------------------------------------------------------------
     def onTrade(self, trade):
