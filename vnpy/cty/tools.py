@@ -219,14 +219,14 @@ def validateNI(bar):
 
 def validateRB(bar):
     """数据检验"""
-    DAY_START1 = dt(9, 00)  # 日盘启动和停止时间
-    DAY_END1 = dt(10, 14)
-    DAY_START2 = dt(10, 30)  # 日盘启动和停止时间
-    DAY_END2 = dt(11, 29)
-    DAY_START3 = dt(13, 30)  # 日盘启动和停止时间
+    DAY_START1 = dt(8, 59)  # 日盘启动和停止时间
+    DAY_END1 = dt(10, 15)
+    DAY_START2 = dt(10, 29)  # 日盘启动和停止时间
+    DAY_END2 = dt(11, 30)
+    DAY_START3 = dt(13, 29)  # 日盘启动和停止时间
     DAY_END3 = dt(14, 59)
 
-    NIGHT_START = dt(21, 00)  # 夜盘启动和停止时间
+    NIGHT_START = dt(20, 59)  # 夜盘启动和停止时间
     NIGHT_END = dt(22, 59)
 
     quoteH = bar.datetime.strftime('%H')
