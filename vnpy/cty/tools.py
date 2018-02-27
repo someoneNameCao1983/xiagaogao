@@ -188,14 +188,14 @@ def roundPrice(price):
 # ----------------------------------------------------------------------
 def validateNI(bar):
     """数据检验"""
-    DAY_START1 = dt(9, 00)  # 日盘启动和停止时间
-    DAY_END1 = dt(10, 14)
-    DAY_START2 = dt(10, 30)  # 日盘启动和停止时间
-    DAY_END2 = dt(11, 29)
-    DAY_START3 = dt(13, 30)  # 日盘启动和停止时间
-    DAY_END3 = dt(14, 59)
+    DAY_START1 = dt(8, 59)  # 日盘启动和停止时间
+    DAY_END1 = dt(10, 15)
+    DAY_START2 = dt(10, 29)  # 日盘启动和停止时间
+    DAY_END2 = dt(11, 30)
+    DAY_START3 = dt(13, 29)  # 日盘启动和停止时间
+    DAY_END3 = dt(15, 00)
 
-    NIGHT_START = dt(21, 00)  # 夜盘启动和停止时间
+    NIGHT_START = dt(20, 50)  # 夜盘启动和停止时间
     NIGHT_END = dt(23, 59)
 
     NIGHT_START2 = dt(00, 00)  # 夜盘启动和停止时间
@@ -246,15 +246,15 @@ def validateRB(bar):
 
 def validateJ(bar):
     """数据检验"""
-    DAY_START1 = dt(9, 00)  # 日盘启动和停止时间
-    DAY_END1 = dt(10, 14)
-    DAY_START2 = dt(10, 30)  # 日盘启动和停止时间
-    DAY_END2 = dt(11, 29)
-    DAY_START3 = dt(13, 30)  # 日盘启动和停止时间
-    DAY_END3 = dt(14, 59)
+    DAY_START1 = dt(8, 59)  # 日盘启动和停止时间
+    DAY_END1 = dt(10, 15)
+    DAY_START2 = dt(10, 29)  # 日盘启动和停止时间
+    DAY_END2 = dt(11, 30)
+    DAY_START3 = dt(13, 29)  # 日盘启动和停止时间
+    DAY_END3 = dt(15, 00)
 
-    NIGHT_START = dt(21, 00)  # 夜盘启动和停止时间
-    NIGHT_END = dt(23, 29)
+    NIGHT_START = dt(20, 59)  # 夜盘启动和停止时间
+    NIGHT_END = dt(23, 30)
 
     quoteH = bar.datetime.strftime('%H')
     quoteMin = bar.datetime.strftime('%M')
@@ -273,15 +273,15 @@ def validateJ(bar):
 
 def validateMA(bar):
     """数据检验"""
-    DAY_START1 = dt(9, 00)  # 日盘启动和停止时间
-    DAY_END1 = dt(10, 14)
-    DAY_START2 = dt(10, 30)  # 日盘启动和停止时间
-    DAY_END2 = dt(11, 29)
-    DAY_START3 = dt(13, 30)  # 日盘启动和停止时间
-    DAY_END3 = dt(14, 59)
+    DAY_START1 = dt(8, 59)  # 日盘启动和停止时间
+    DAY_END1 = dt(10, 15)
+    DAY_START2 = dt(10, 29)  # 日盘启动和停止时间
+    DAY_END2 = dt(11, 30)
+    DAY_START3 = dt(13, 29)  # 日盘启动和停止时间
+    DAY_END3 = dt(15, 00)
 
     NIGHT_START = dt(21, 00)  # 夜盘启动和停止时间
-    NIGHT_END = dt(23, 29)
+    NIGHT_END = dt(23, 30)
 
     quoteH = bar.datetime.strftime('%H')
     quoteMin = bar.datetime.strftime('%M')
@@ -299,16 +299,36 @@ def validateMA(bar):
         return False
 def validateIF(bar):
     """数据检验"""
-    DAY_START1 = dt(9, 30)  # 日盘启动和停止时间
-    DAY_END1 = dt(11, 29)
-
+    DAY_START1 = dt(9, 14)  # 日盘启动和停止时间
+    DAY_END1 = dt(11, 30)
+    DAY_START2 = dt(12, 59)  # 日盘启动和停止时间
+    DAY_END2 = dt(15, 00)
     quoteH = bar.datetime.strftime('%H')
     quoteMin = bar.datetime.strftime('%M')
 
     bartime = dt(int(quoteH), int(quoteMin))
     #if self.bar:
-    if (bartime >= DAY_START1 and bartime <= DAY_END1):
+    if DAY_END1 >= bartime >= DAY_START1 or DAY_END2 >= bartime >= DAY_START2:
         return True
     else:
         #print ('非交易时间的数据 %s' % bar.datetime)
         return False
+def rbOpenTime(bar):
+    rbStopTime = ['2245', '2246', '2247', '2248', '2249', '2250', '2251', '2252', '2253', '2254', '2255', '2256', '2257', '2258', '2259',
+          '1445', '1446', '1447', '1448', '1449', '1450', '1451', '1452', '1453', '1454', '1455', '1456', '1457', '1458', '1459',
+          '1121','1122','1123', '1124','1125', '1126', '1127', '1128', '1129',
+          '1009', '1010', '1011', '1012', '1013', '1014', '1015'
+          '0859', '0900', '0901', '0902', '0903', '0904', '0905', '0906',
+          '2059', '2100', '2101', '2102', '2103', '2104', '2105', '2106']
+    rbContractDay = ['2016/8/16', '2016/11/25', '2017/3/21', '2017/8/4']
+    if bar.symbol == 'RB':
+        mint = bar.datetime.strftime('%H%M')
+        xq = bar.datetime.weekday()
+        if bar.date in rbContractDay or mint in rbStopTime:
+            isOpen = True
+        elif xq == 4 and (bar.datetime.strftime('%H') == '21' or bar.datetime.strftime('%H') == '22'):
+            isOpen = True
+            # self.output('周五：' + bar.datetime.strftime('%Y%m%d-%H%M'))
+        else:
+            isOpen = False
+    return isOpen
