@@ -306,14 +306,16 @@ class VtErrorData(VtBaseData):
 
 
 ########################################################################
-class VtLogData(VtBaseData):
+class VtLogData(VtBaseData, Base):
     """日志数据类"""
-
+    __tablename__ = 'log_data'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    logTime = Column(String(32))  # 报单方向
+    logContent = Column(String(255))  # 报单开平仓
     #----------------------------------------------------------------------
     def __init__(self):
         """Constructor"""
         super(VtLogData, self).__init__()
-        
         self.logTime = time.strftime('%X', time.localtime())    # 日志生成时间
         self.logContent = EMPTY_UNICODE                         # 日志信息
 

@@ -5,8 +5,8 @@ import shelve
 from collections import OrderedDict
 from datetime import datetime
 
-from pymongo import MongoClient, ASCENDING
-from pymongo.errors import ConnectionFailure
+#from pymongo import MongoClient, ASCENDING
+#from pymongo.errors import ConnectionFailure
 
 from vnpy.event import Event
 from vnpy.trader.vtGlobal import globalSetting
@@ -14,6 +14,7 @@ from vnpy.trader.vtEvent import *
 from vnpy.trader.vtGateway import *
 from vnpy.trader.language import text
 from vnpy.trader.vtFunction import getTempPath
+from vnpy.cty.tools import *
 
 
 ########################################################################
@@ -103,7 +104,7 @@ class MainEngine(object):
             gateway.connect()
             
             # 接口连接后自动执行数据库连接的任务
-            self.dbConnect()        
+            self.dbConnect()
    
     #----------------------------------------------------------------------
     def subscribe(self, subscribeReq, gatewayName):
@@ -182,33 +183,39 @@ class MainEngine(object):
         """连接MongoDB数据库"""
         if not self.dbClient:
             # 读取MongoDB的设置
-            try:
-                # 设置MongoDB操作的超时时间为0.5秒
-                self.dbClient = MongoClient(globalSetting['mongoHost'], globalSetting['mongoPort'], connectTimeoutMS=500)
-                
-                # 调用server_info查询服务器状态，防止服务器异常并未连接成功
-                self.dbClient.server_info()
+            #try:
+            # 设置MongoDB操作的超时时间为0.5秒
+            #self.dbClient = MongoClient(globalSetting['mongoHost'], globalSetting['mongoPort'], connectTimeoutMS=500)
 
-                self.writeLog(text.DATABASE_CONNECTING_COMPLETED)
-                
-                # 如果启动日志记录，则注册日志事件监听函数
-                if globalSetting['mongoLogging']:
-                    self.eventEngine.register(EVENT_LOG, self.dbLogging)
+            # 调用server_info查询服务器状态，防止服务器异常并未连接成功
+            #self.dbClient.server_info()
+
+            #self.writeLog(text.DATABASE_CONNECTING_COMPLETED)
+
+            # 如果启动日志记录，则注册日志事件监听函数
+            if globalSetting['mongoLogging']:
+                self.eventEngine.register(EVENT_LOG, self.dbLogging)
                     
-            except ConnectionFailure:
-                self.writeLog(text.DATABASE_CONNECTING_FAILED)
+            #except ConnectionFailure:
+            #    self.writeLog(text.DATABASE_CONNECTING_FAILED)
     
     #----------------------------------------------------------------------
     def dbInsert(self, dbName, collectionName, d):
         """向MongoDB中插入数据，d是具体数据"""
+        """
         if self.dbClient:
             db = self.dbClient[dbName]
             collection = db[collectionName]
             collection.insert_one(d)
         else:
             self.writeLog(text.DATA_INSERT_FAILED)
+        """
+        logData = VtLogData()
+        logData.logContent = d['content']
+        #saveEntityToMysql(logData, 'tradeUrl')
     
     #----------------------------------------------------------------------
+    '''
     def dbQuery(self, dbName, collectionName, d, sortKey='', sortDirection=ASCENDING):
         """从MongoDB中读取数据，d是查询要求，返回的是数据库查询的指针"""
         if self.dbClient:
@@ -227,7 +234,7 @@ class MainEngine(object):
         else:
             self.writeLog(text.DATA_QUERY_FAILED)   
             return []
-        
+    '''
     #----------------------------------------------------------------------
     def dbUpdate(self, dbName, collectionName, d, flt, upsert=False):
         """向MongoDB中更新数据，d是具体数据，flt是过滤条件，upsert代表若无是否要插入"""
