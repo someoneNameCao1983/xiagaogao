@@ -601,10 +601,10 @@ class CtaEngine(object):
         for strategy in self.strategyDict.values():
             flt = {'name': strategy.name,
                    'vtSymbol': strategy.vtSymbol}
-            posData = self.mainEngine.dbQuery(POSITION_DB_NAME, strategy.className, flt)
-            
-            for d in posData:
-                strategy.pos = d['pos']
+            #posData = self.mainEngine.dbQuery(POSITION_DB_NAME, strategy.className, flt)
+            strategy.pos = 0
+            #for d in posData:
+                #strategy.pos = d['pos']
                 
     #----------------------------------------------------------------------
     def roundToPriceTick(self, priceTick, price):
