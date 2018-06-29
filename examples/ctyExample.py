@@ -14,7 +14,7 @@ import talib as ta
 import math
 import sys
 import math
-import pymongo
+#import pymongo
 from vnpy.trader.app.ctaStrategy.ctaBase import *
 from vnpy.trader.vtConstant import (EMPTY_STRING, EMPTY_UNICODE,
                                     EMPTY_FLOAT, EMPTY_INT)
@@ -352,12 +352,20 @@ class TradingResult(Base):
         self.pnl = 10                  # 净盈亏
 
 
-engine = create_engine(globalSetting['btiUrl'])
-Session = sessionmaker(bind=engine)
-s = Session()
-trade1 = TradingResult()
+#engine = create_engine(globalSetting['tradeUrl'])
+#Session = sessionmaker(bind=engine)
+#s = Session()
+#trade1 = VtLogData()
+#trade1.logContent = '123'
+#saveEntityToMysql(trade1, 'tradeUrl')
 #trade1.pnl = 230
 #s.add(trade1)
 #s.add(trade4)
 #Base.metadata.create_all(engine)
 #s.commit()
+d = {
+            'content': 1,
+            'time': 2,
+            'gateway': 3
+        }
+print d['content']
