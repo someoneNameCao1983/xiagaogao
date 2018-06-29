@@ -55,7 +55,7 @@ def runChildProcess():
     me.connect('CTP')
     printLog(u'连接CTP接口')
     
-    sleep(5)    # 等待CTP接口初始化
+    sleep(15)    # 等待CTP接口初始化
     
     cta = me.appDict[ctaStrategy.appName]
     
