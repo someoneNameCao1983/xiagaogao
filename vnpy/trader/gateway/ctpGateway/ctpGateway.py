@@ -123,8 +123,9 @@ class CtpGateway(VtGateway):
                 userProductInfo = str(setting['userProductInfo'])
                 self.tdApi.requireAuthentication = True
             else:
-                authCode = None
-                userProductInfo = None
+                authCode = '1234'
+                userProductInfo = 'G2BF'
+                self.tdApi.requireAuthentication = False
 
         except KeyError:
             log = VtLogData()
@@ -135,7 +136,7 @@ class CtpGateway(VtGateway):
         
         # 创建行情和交易接口对象
         self.mdApi.connect(userID, password, brokerID, mdAddress)
-        self.tdApi.connect(userID, password, brokerID, tdAddress,authCode, userProductInfo)
+        self.tdApi.connect(userID, password, brokerID, tdAddress, authCode, userProductInfo)
         
         # 初始化并启动查询
         self.initQuery()
@@ -359,7 +360,7 @@ class CtpMdApi(MdApi):
         tick.askPrice1 = roundPrice(data['AskPrice1'])
         tick.askVolume1 = data['AskVolume1']
         tickD = copy.deepcopy(tick)
-        saveEntityToMysql(tickD, 'Simnow')
+        saveEntityToMysql(tickD, 'tradeUrl')
         self.gateway.onTick(tick)
         
     #---------------------------------------------------------------------- 
@@ -389,6 +390,7 @@ class CtpMdApi(MdApi):
         if not self.connectionStatus:
             # 创建C++环境中的API对象，这里传入的参数是需要用来保存.con文件的文件夹路径
             path = getTempPath(self.gatewayName + '_')
+            print path
             self.createFtdcMdApi(path)
             
             # 注册服务器地址

@@ -10,7 +10,6 @@ from sqlalchemy.orm import sessionmaker
 from time import time
 from datetime import  time as dt
 from datetime import datetime, timedelta
-import pymongo
 import copy
 import sys
 from sqlalchemy.ext.declarative import *
@@ -75,6 +74,8 @@ def saveEntityToMysql(Entity,DbName):
     elif DbName == 'Quote':
         engine = create_engine(globalSetting['quoteUrl'])
     #回测库
+    elif DbName == 'tradeUrl':
+        engine = create_engine(globalSetting['tradeUrl'])
     elif DbName == 'BTI':
         engine = create_engine(globalSetting['btiUrl'])
     else:
