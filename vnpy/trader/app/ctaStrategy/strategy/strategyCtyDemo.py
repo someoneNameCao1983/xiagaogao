@@ -37,39 +37,50 @@ class CtyEmaDemoStrategy(CtaTemplate):
     barMinute = EMPTY_STRING
 
     closeHistory = []             # 缓存最新价的数组
+    closeArray = []               # 缓存最新价的数组
     lowHistory = []               # 缓存最低价的数组
     highHistory = []              # 缓存最低价的数组
     fastHistory = []              # 短均线数组
     slowHistory = []              # 长均线数组
     holdTimes = []                # 持仓时间
-    minHistory = 100              # 最少缓存60根开始计算
-    maxHistory = 120              # 最多缓存120根
+    minHistory = 50              # 最少缓存60根开始计算
+    maxHistory = 121              # 最多缓存120根
 
     fastMa0 = EMPTY_FLOAT         # 当前最新的快速EMA
     fastMa1 = EMPTY_FLOAT         # 上一根的快速EMA
     slowMa0 = EMPTY_FLOAT         # 当前最新的慢速EMA
     slowMa1 = EMPTY_FLOAT         # 上一根的慢速EMA
-    openPrice = EMPTY_FLOAT       # 开仓价
+
+    topPrice = EMPTY_FLOAT        # 开仓前最高价
+    lowPrice = EMPTY_FLOAT        # 开仓后最低价
+    highPrice = EMPTY_FLOAT       # 观测区最高价
     stopPrice = EMPTY_FLOAT       # 固定止损价
     addPrice = EMPTY_FLOAT        # 加仓价
-    lastTAR = EMPTY_FLOAT         # 当前快速均线周期震荡范围
-    preTAR = EMPTY_FLOAT          # 前一周期快速均线震荡范围
+
+    shortATR = EMPTY_FLOAT        # 短期ATR
     profitPrice = EMPTY_FLOAT     # 止盈价
     lastOrderType = 'None'        # 最近一次下单动作 K开仓 J加仓 P平仓 Z 止盈
-    orderList = []                # 保存委托代码的列表
 
-    upRate = 30                   # 开仓均线上浮比例 千分位
-    stopRate = 5                  # 平仓均线下沉比例 千分位
-    f2sjj = 0                     # 快慢均线夹角
+    kcFlag = False                # 开仓监控标志位
+    kcMonitorCount = 1            # 开仓监控次数
+    orderList = []                # 保存委托代码的列表
+    cycle = 20                    # 周期感觉最终要的
 
     kCount = 0                    # 开仓次数
     jCount = 0                    # 加仓次数
-    pauseTime = 0                 # 暂停次数
     gkCount = 0                   # 高开次数
     zdCount = 0                   # Atr过大次数
     mCount = 0                    # 移动次数
     dkPCount = 0                  # 暴跌平仓次数
     moveStopTime = 0              # 挪动止损线次数
+
+    lastProfit = 0                # 开仓盈利次数
+    lastLoss = 0                  # 开仓亏损次数
+
+    holdScore = 0                 # 持仓评分
+    kcScore = 0                   # 开仓评分
+    holdBars = 0                  # 持仓周期
+
 
     holiday = ['2015/2/13', '2015/4/3', '2015/4/30', '2015/6/19', '2015/9/2', '2015/9/25', '2015/12/31',
                '2016/2/5', '2016/3/29', '2016/4/29', '2016/6/8', '2016/9/14', '2016/9/30', '2016/12/30',
@@ -82,9 +93,9 @@ class CtyEmaDemoStrategy(CtaTemplate):
                  'fastK',
                  'slowK',
                  'maxHoldPos',
-                 'upRate',
-                 'stopRate',
-                 'f2sjj']
+                 'openRatio',
+                 'stopRatio',
+                 'cycle']
     
     # 变量列表，保存了变量的名称
     varList = ['inited',
@@ -106,6 +117,7 @@ class CtyEmaDemoStrategy(CtaTemplate):
         # 策略时方便（更多是个编程习惯的选择）
         self.pos = 0
         self.closeHistory = []  # 缓存最新价的数组
+        self.closeArray = []  # 缓存最新价的数组
         self.lowHistory = []  # 缓存最低价的数组
         self.highHistory = []  # 缓存最低价的数组
         self.fastHistory = []
@@ -130,7 +142,9 @@ class CtyEmaDemoStrategy(CtaTemplate):
         self.slowHistory = []
         self.holdTimes = []
         self.orderList = []
+        self.closeArray = []
         self.putEvent()
+        self.holdBars = 0
 
     #----------------------------------------------------------------------
     def onStart(self):
@@ -147,14 +161,13 @@ class CtyEmaDemoStrategy(CtaTemplate):
         
     #----------------------------------------------------------------------
     def onTick(self, tick):
-        """收到行情TICK推送（必须由用户继承实现）"""
         # 计算K线
-        # 1分钟之内挂单有效期间不做新的判断，避免重复下单
         tickMinute = tick.datetime.minute
 
         if tickMinute != self.barMinute:
             if self.bar:
                 self.onBar(self.bar)
+
             bar = VtBarData()
             bar.vtSymbol = tick.vtSymbol
             bar.symbol = tick.symbol
@@ -167,39 +180,48 @@ class CtyEmaDemoStrategy(CtaTemplate):
 
             bar.date = tick.date
             bar.time = tick.time
-            bar.datetime = tick.datetime    # K线的时间设为第一个Tick的时间
-            bar.volume = bar.volume+tick.bidVolume1
-            # 实盘中用不到的数据可以选择不算，从而加快速度
-            #bar.volume = tick.volume
-            #bar.openInterest = tick.openInterest
+            bar.datetime = tick.datetime  # K线的时间设为第一个Tick的时间
 
-            self.bar = bar                  # 这种写法为了减少一层访问，加快速度
-            self.barMinute = tickMinute     # 更新当前的分钟
-        else:                               # 否则继续累加新的K线
-            bar = self.bar                  # 写法同样为了加快速度
+            # 实盘中用不到的数据可以选择不算，从而加快速度
+            # bar.volume = tick.volume
+            # bar.openInterest = tick.openInterest
+
+            self.bar = bar  # 这种写法为了减少一层访问，加快速度
+            self.barMinute = tickMinute  # 更新当前的分钟
+
+        else:  # 否则继续累加新的K线
+            bar = self.bar  # 写法同样为了加快速度
+
             bar.high = max(bar.high, tick.lastPrice)
             bar.low = min(bar.low, tick.lastPrice)
-            #bar.datetime = tick.datetime
+            bar.datetime = tick.datetime
             bar.close = tick.lastPrice
-            bar.volume = bar.volume + tick.bidVolume1
         
     #----------------------------------------------------------------------
     def onBar(self, bar):
         """收到Bar推送（必须由用户继承实现）"""
         if self.bar and self.bar.date != bar.date:
+            """当日期变化时触发相应的处理"""
             self.newDay(bar)
         for orderID in self.orderList:
             self.cancelOrder(orderID)
             self.orderList = []
 
         # 排除高开对均线的影响
+        '''
         if self.bar and self.pos == 0:
             high = bar.open - self.bar.close
             if (high / bar.open) * 100 > 1:
                 self.gkCount += 1
                 self.onInit()
                 #print ("排除低开 时间:%s,价差:%f" % (self.bar.datetime.strftime('%Y%m%d-%H%M'), bar.open - self.bar.close))
-
+        '''
+        if self.bar and self.pos == 0:
+            high = abs(bar.open - bar.close)
+            if (high / bar.close) * 100 > 1:
+                self.gkCount += 1
+                return
+                # self.onInit()
         if bar.symbol == 'NI' and validateNI(bar):
             pass
         elif (bar.symbol == 'RB' or bar.symbol == 'RB0000') and validateRB(bar):
@@ -217,13 +239,13 @@ class CtyEmaDemoStrategy(CtaTemplate):
         self.closeHistory.append(float(bar.close))
         self.lowHistory.append(float(bar.low))
         self.highHistory.append(float(bar.high))
+        '''至少需要minHistory根'''
         if len(self.closeHistory) < self.minHistory:
             return
         if len(self.closeHistory) > self.maxHistory:
             self.closeHistory.pop(0)
             self.lowHistory.pop(0)
             self.highHistory.pop(0)
-
 
         closeArray = np.array(self.closeHistory)
         lowArray = np.array(self.lowHistory)
@@ -232,107 +254,59 @@ class CtyEmaDemoStrategy(CtaTemplate):
         # 计算快慢均线
         fastSMA = ta.SMA(closeArray, timeperiod=self.fastK)
         slowSMA = ta.SMA(closeArray, timeperiod=self.slowK)
-
-        # 如果有持仓重新记录均线
-        lastCyc = (self.fastK+1)*(-1)
-        preCyc = (self.fastK*2+1)*(-1)
-
-        lastCycMax = ta.MAX(slowSMA[lastCyc:-1], timeperiod=self.fastK)[-1]
-        preCycMax = ta.MAX(slowSMA[preCyc:lastCyc], timeperiod=self.fastK)[-1]
-        lastCycMin = ta.MIN(slowSMA[lastCyc:-1], timeperiod=self.fastK)[-1]
-        preCycMin = ta.MIN(slowSMA[preCyc:lastCyc], timeperiod=self.fastK)[-1]
-
-        self.lastTAR = ta.ATR(highArray[lastCyc:-1], lowArray[lastCyc:-1], closeArray[lastCyc:-1])[-1]
-        self.preTAR = ta.ATR(highArray[preCyc:lastCyc], lowArray[preCyc:lastCyc], closeArray[preCyc:lastCyc])[-1]
-
         self.fastMa0 = fastSMA[-1]
-        self.fastMa1 = fastSMA[-2]
         self.slowMa0 = slowSMA[-1]
+        self.fastMa1 = fastSMA[-2]
         self.slowMa1 = slowSMA[-2]
+        self.shortATR = ta.ATR(highArray[self.cycle * -1:-2], lowArray[self.cycle * -1:-2], closeArray[self.cycle * -1:-2])[
+            -1]
 
-        # 斜率
-        fastk1 = (self.fastMa0 - self.fastMa1) / 1
-        slowk1 = (self.slowMa0 - self.slowMa1) / 1
-        # 增长率
-        fastUpRat = (self.fastMa0 / self.fastMa1 - 1) * 100
-        slowUpRat = abs(self.slowMa0 / self.slowMa1 - 1) * 100
-        # 正切值
-        slowjj = round(math.atan(slowk1) * 180 / math.pi, 2)
-        fastjj = round(math.atan(fastk1) * 180 / math.pi, 2)
-
+        #self.lowPrice = ta.MIN(np.array(self.closeHistory), timeperiod=len(self.closeHistory))[-2]
+        #self.highPrice = ta.MAX(np.array(self.closeHistory), timeperiod=len(self.closeHistory))[-2]
+        closeArray.sort()
+        #除噪音
+        self.lowPrice = (closeArray[0]+closeArray[1])/2
+        self.highPrice = (closeArray[-1]+closeArray[-2])/2
         qiedian = bar.datetime.strftime('%Y%m%d-%H%M')
-        if qiedian == '20170904-0901':
+        if qiedian == '20170712-1050':
             print bar.datetime.weekday()
+
         '''生成开仓，平仓，加仓，止损移动标志位'''
-        if self.pos < self.maxHoldPos and self.slowMa0 > self.slowMa1 and self.fastMa0 > self.fastMa1 and lastCycMax > preCycMax and lastCycMin > preCycMin and self.pauseTime == 0:
-            openFlag = (slowUpRat * 1000 > self.upRate
-                        #and (fastjj - slowjj) > self.f2sjj
-                        and self.lastTAR > self.preTAR)
-            if openFlag and self.lastTAR > (bar.close/100*2):
-                self.zdCount += 1
-                openFlag = False
-        else:
-            openFlag = False
+        openFlag = False
+        closeFlag = False
+        if self.pos == 0 and not self.kcFlag:
+            '''开仓信号识别'''
+            self.monitorQuote()
+        elif self.pos > 0:
+            self.closeArray.append(float(bar.close))
+            '''平仓信号识别'''
+            closeFlag = self.monitorPOS()
+        elif self.kcFlag:
+            '''是否开仓'''
+            openFlag = self.kcATR()
+            self.kcMonitorCount = self.kcMonitorCount + 1
+        if self.kcMonitorCount == 10:
+            self.kcFlag = False
+            self.kcMonitorCount = 1
 
-        # 平仓标识
-        if self.pos > 0 and self.slowMa0 < self.slowMa1 and self.fastMa0 < self.fastMa1:
-            zd = ta.MIN(closeArray, timeperiod=self.fastK)[-1]
-            zg = ta.MAX(closeArray, timeperiod=self.fastK)[-1]
-            closeFlag = (slowUpRat * 1000 > self.stopRate
-                        #self.f2sjj > self.stopjj
-                        and self.lastTAR > self.preTAR
-                        and self.stopPrice > bar.close
-                        and zd >= bar.close
-                         )
-            if (zg - float(bar.close)) > float(bar.close) / 100 * 3:
-                closeFlag = True
-                self.dkPCount += 1
-        else:
-            closeFlag = False
-
-
-        # 开仓
         if len(self.orderList) == 0:
             # 开仓
-            if openFlag and self.pos < self.maxHoldPos:
+            if openFlag and self.pos == 0:
+                print openFlag
                 self.buyCheck(bar)
-                #print self.f2sjj
+            #elif openFlag and 0 < self.pos < self.maxHoldPos and bar.close >= self.profitPrice:
+            #    self.buyCheck(bar)
                 #print ("多头开仓 f2s夹角:%f,开仓价:%f,min:%s" % (f2sjj, bar.close, bar.datetime.strftime('%H:%M:%S')))
             # 平仓
-            if abs(self.pos) > 0 and closeFlag and not openFlag:
+            if abs(self.pos) > 0 and closeFlag:
                 orderID = self.sell(bar.close, abs(self.pos))
                 self.orderList.append(orderID)
                 self.lastOrderType = 'P'
-                #print slowUpRat
-                if self.moveStopTime > 0:
-                    self.moveStopTime = 0
-                    self.mCount += 1
-                # print ("1多头下平仓单 开仓价:%f,平仓价%f,min:%s, pos:%d" % (self.openPrice, bar.close, bar.datetime.strftime('%H:%M:%S'), self.pos))
-        # 有持仓的日常维护
-        if self.pos > 0:
-            if bar.close > self.profitPrice:
-                self.moveStopTime += 1
-                if self.moveStopTime < 4:
-                    self.stopPrice = self.stopPrice + 4 * self.lastTAR
-                elif self.moveStopTime >= 4:
-                    self.stopPrice = self.stopPrice + 1 * self.lastTAR
-                self.profitPrice = self.profitPrice + 4 * self.lastTAR
-            # 长假前清仓
-            if bar.date in self.holiday:
-                if bar.high >= self.profitPrice:
-                    orderID = self.sell(bar.close, abs(self.pos))
-                    self.orderList.append(orderID)
-                    self.lastOrderType = 'P'
-                    #print ("长假盈利清仓 时间:%s,价差:%f" % (self.bar.datetime.strftime('%Y%m%d-%H%M'), float(bar.close) - self.openPrice))
-                elif bar.datetime.strftime('%H%M') == '1449':
-                    orderID = self.sell(bar.close, abs(self.pos))
-                    self.orderList.append(orderID)
-                    self.lastOrderType = 'P'
-                    #print ("长假亏损清仓 时间:%s,价差:%f" % (self.bar.datetime.strftime('%Y%m%d-%H%M'), float(bar.close) - self.openPrice))
-        if self.pauseTime > 0:
-            self.pauseTime -= 1
+        if self.pos > 0 and closeFlag:
+            self.moveProfitPrice()
         self.putEvent()
-        
+        # tickD = copy.deepcopy(tick)
+        # saveEntityToMysql(tickD, 'tradeUrl')
     #----------------------------------------------------------------------
     def onOrder(self, order):
         """收到委托变化推送（必须由用户继承实现）"""
@@ -348,15 +322,19 @@ class CtyEmaDemoStrategy(CtaTemplate):
         maDay = ['2016/8/9', '2016/12/1', '2017/4/7', '2017/8/4']
         if bar.symbol == 'NI' and bar.date in niDay:
             self.onInit()
+            self.closeHistory = []  # 缓存最新价的数组
             self.output(u'NI自然日切换:'+bar.date)
         elif bar.symbol == 'RB' and bar.date in rbDay:
             self.onInit()
+            self.closeHistory = []  # 缓存最新价的数组
             #self.output(u'RB自然日切换:' + bar.date)
         elif bar.symbol == 'J' and bar.date in jDay:
             self.onInit()
+            self.closeHistory = []  # 缓存最新价的数组
             self.output(u'J自然日切换:' + bar.date)
         elif bar.symbol == 'MA' and bar.date in maDay:
             self.onInit()
+            self.closeHistory = []  # 缓存最新价的数组
             self.output(u'MA自然日切换:' + bar.date)
     # ----------------------------------------------------------------------
     def buyCheck(self, bar):
@@ -426,29 +404,200 @@ class CtyEmaDemoStrategy(CtaTemplate):
         # else:
             #self.output('before holiday'+bar.date)
 
-
-
     #----------------------------------------------------------------------
     def onTrade(self, trade):
         """收到成交推送（必须由用户继承实现）"""
         # 对于无需做细粒度委托控制的策略，可以忽略onOrder
         if self.lastOrderType == 'K' and self.pos == 1:
             self.openPrice = float(trade.price)  # 锚定开仓价
-            self.stopPrice = self.slowMa0  # 设置止损价
             self.kCount += 1
-            self.profitPrice = float(trade.price) + self.lastTAR * 4  # 止盈价设定
-            #print ("多头开仓成功  开仓价:%f , 加仓价:%f, 平仓价:%f, fast:%f ,slow:%f,  min:%s" % (self.openPrice, self.addPrice, self.stopPrice, self.fastMa0, self.slowMa0, trade.tradeTime))
-        elif self.pos <= self.maxHoldPos and self.pos > 1:
-            self.jCount += 1
-            #print ("多头加仓成功  加仓价:%f,下一加仓价:%f, 当前平仓价:%f, min:%s" % (trade.price, self.addPrice, self.stopPrice,trade.tradeTime))
+            #self.onInit()
+            self.kcFlag = False
+            self.holdScore = 0
         elif self.lastOrderType == 'P':
             #print ("多头止损成功 开仓价:%f,平仓价%f,min:%s, pos:%d" % (self.openPrice, trade.price, trade.tradeTime, trade.volume))
+            if float(trade.price)-self.shortATR <= self.openPrice:
+                self.lastLoss += 1
+                self.lastProfit = 0
+            else:
+                self.lastProfit += 1
+                self.lastLoss = 0
+            self.onInit()
             self.openPrice = EMPTY_FLOAT
+            self.holdScore = 0
             self.stopPrice = EMPTY_FLOAT
             self.addPrice = EMPTY_FLOAT
             self.profitPrice = EMPTY_FLOAT
             self.lastOrderType = 'None'
+            self.pauseTime = self.cycle
+            self.supportPrice = EMPTY_FLOAT
+            self.topPrice = EMPTY_FLOAT
+            self.lowCount = 0
 
+    # ----------------------------------------------------------------------
+    def monitorQuote(self):
+        '''长期处于加个底部'''
+        #closeArray = np.array(self.closeHistory)
+        #fastSMA = ta.SMA(closeArray, timeperiod=self.fastK)
+        #k1 = fastSMA[-1] - fastSMA[-2]
+        #k2 = fastSMA[-2] - fastSMA[-3]
+        '''处于加个顶部'''
+        # self.lowPrice = ta.MIN(np.array(self.closeHistory), timeperiod=self.fastK)[-1]
+        # self.highPrice = ta.MAX(np.array(self.closeHistory), timeperiod=self.fastK)[-1]
+        # diff = self.shortATR * 5
+        if float(self.bar.close) == self.lowPrice:
+            posleve = 999
+        else:
+            posleve = abs(self.highPrice - float(self.fastMa0)) / abs(float(self.fastMa0) - self.lowPrice)
+        if posleve < 1/9:
+            self.kcFlag = True
+        #if (self.highPrice - float(self.bar.close)) < self.shortATR and self.highPrice - self.lowPrice > diff:
+        #    self.kcFlag = True
+    #----------------------------------------------------------------------
+    def kcATR(self):
+        """进行开仓信号判断"""
+        closeArray = np.array(self.closeHistory)
+
+        lastCyc = (self.cycle + 1) * (-1)
+        preCyc = (self.cycle * 2 + 1) * (-1)
+        # 计算快慢均线
+        fastSMA = ta.SMA(closeArray, timeperiod=self.fastK)
+        lastCycMax = ta.MAX(fastSMA[lastCyc:-1], timeperiod=self.cycle)[-1]
+        preCycMax = ta.MAX(fastSMA[preCyc:lastCyc], timeperiod=self.cycle)[-1]
+        lastCycMin = ta.MIN(fastSMA[lastCyc:-1], timeperiod=self.cycle)[-1]
+        preCycMin = ta.MIN(fastSMA[preCyc:lastCyc], timeperiod=self.cycle)[-1]
+        openFlag = False
+        #if lastCycMax > preCycMax and lastCycMin > preCycMin and (self.bar.close - self.bar.open) > self.shortATR:
+        if self.highPrice - self.lowPrice > 5*self.shortATR and self.bar.close > self.highPrice:
+            openFlag = True
+        '''
+        if self.lastLoss > 1 and openFlag:
+            if (lastCycMax - preCycMax) > self.shortATR * self.lastLoss and (lastCycMin - preCycMin) > self.shortATR * self.lastLoss:
+                openFlag = True
+            else:
+                openFlag = False
+        '''
+        if openFlag:
+            self.topPrice = ta.MAX(closeArray,timeperiod=len(self.closeHistory))[-1]
+        return openFlag
+
+    # ----------------------------------------------------------------------
+    def monitorPOS(self):
+        """持仓监控 持仓健康度"""
+        closeArray = np.array(self.closeHistory)
+        lastCyc = (self.cycle + 1) * (-1)
+        preCyc = (self.cycle * 2 + 1) * (-1)
+        self.holdBars += 1
+        # 计算快慢均线
+        fastSMA = ta.SMA(closeArray, timeperiod=self.fastK)
+        lastCycMax = ta.MAX(fastSMA[lastCyc:-1], timeperiod=self.cycle)[-1]
+        preCycMax = ta.MAX(fastSMA[preCyc:lastCyc], timeperiod=self.cycle)[-1]
+        lastCycMin = ta.MIN(fastSMA[lastCyc:-1], timeperiod=self.cycle)[-1]
+        preCycMin = ta.MIN(fastSMA[preCyc:lastCyc], timeperiod=self.cycle)[-1]
+        # 趋势分数
+        barScore = 0
+        if lastCycMax < preCycMax and lastCycMin < preCycMin:
+            barScore = barScore - 10
+        if lastCycMax > preCycMax and lastCycMin > preCycMin:
+            barScore = barScore + 10
+        # 盈利分数
+        diff1 = fastSMA[-1] - self.openPrice
+        #rat = diff1 / self.openPrice * 100 * 10
+        barScore = barScore + diff1
+        #if self.openPrice > self.bar.close:
+        #    barScore = barScore + 10
+        # 价格位置分数
+        if float(self.fastMa0) == self.lowPrice:
+            posleve = 999
+        else:
+            posleve = abs(self.highPrice - self.fastMa0)/abs(self.fastMa0 - self.lowPrice)
+        # 价格超过开仓支撑位分数
+        if self.fastMa0 > self.topPrice:
+            barScore = barScore + 10
+        if self.highPrice-self.lowPrice > 4*self.shortATR:
+            if posleve <= 1/19:
+                barScore = barScore + 40
+            if 1/19 <posleve <= 1/9:
+                barScore = barScore + 30
+            if 1/9 <posleve <= 1/4:
+                barScore = barScore + 20
+            if 1/4 < posleve <= 1/2:
+                barScore = barScore + 10
+            if 1/2 < posleve <= 1:
+                barScore = barScore
+            if 1 < posleve <= 2:
+                barScore = barScore - 20
+            if 2 < posleve <= 3:
+                barScore = barScore - 30
+            if posleve == 999:
+                barScore = barScore - 40
+        # 价格速度分数
+        k1 = fastSMA[-1] - fastSMA[-2]
+        k2 = fastSMA[-2] - fastSMA[-3]
+        if k2 < 0 and k1 < 0 and k1 < k2-1:
+            barScore = barScore - 10
+        if self.lastLoss > 1:
+            barScore = barScore - 10
+        if self.lastProfit > 1:
+            barScore = barScore + 10
+        if self.holdBars > 60:
+            barScore = barScore + 10
+
+        closeFlag = False
+                #print ("时间:%s,价差:%f,%f,atr:%f" % (self.bar.datetime.strftime('%Y%m%d-%H%M'), diff,self.holdScore,rat))
+        if self.holdScore - barScore > 30:
+            closeFlag = True
+        self.holdScore = barScore
+        if self.holdScore < 0:
+            closeFlag = True
+        if closeFlag and self.holdBars > 1:
+            print ("平仓:%s,位置:%f,分数：%f,价差:%f,持仓周期:%d" % (
+                self.bar.datetime.strftime('%Y%m%d-%H%M'), posleve, self.holdScore, diff1, self.holdBars))
+            print ("最高:%f,最低：%f,开仓:%f,平仓:%f" % (
+                self.highPrice, self.lowPrice, self.openPrice, self.bar.close))
+            #print ("平仓时间:%s,位置:%f,分数：%f,开仓价差:%f,持仓周期:d" % (
+            #    self.bar.datetime.strftime('%Y%m%d-%H%M'), posleve, self.holdScore, rat, self.holdBars))
+        #else:
+        #    print ("时间:%s,位置:%f,分数：%f,atr:%f" % (
+        #        self.bar.datetime.strftime('%Y%m%d-%H%M'), posleve, self.holdScore, rat))
+            # 导数由正变负
+        """
+        if not closeFlag and self.lastLoss >= 2:
+            if self.bar.close < self.openPrice:
+                closeFlag = True
+        if k1 < 0 and k2 > 0:
+            self.lowCount = self.lowCount + 1
+            if fastSMA[-1] > self.topPrice:
+                self.topPrice = fastSMA[-1]
+        """
+        return closeFlag
+    # ----------------------------------------------------------------------
+    def moveProfitPrice(self):
+        """持仓监控"""
+        # 有持仓的日常维护
+        # 长假前清仓
+        if self.bar.date in self.holiday and abs(self.pos) > 0 and self.lastOrderType is None:
+            if self.bar.high >= self.profitPrice:
+                orderID = self.sell(self.bar.close, abs(self.pos))
+                self.orderList.append(orderID)
+                self.lastOrderType = 'P'
+                # print ("长假盈利清仓 时间:%s,价差:%f" % (self.bar.datetime.strftime('%Y%m%d-%H%M'), float(bar.close) - self.openPrice))
+            elif self.bar.datetime.strftime('%H%M') == '1449':
+                orderID = self.sell(self.bar.close, abs(self.pos))
+                self.orderList.append(orderID)
+                self.lastOrderType = 'P'
+                # print ("长假亏损清仓 时间:%s,价差:%f" % (self.bar.datetime.strftime('%Y%m%d-%H%M'), float(bar.close) - self.openPrice))
+        """
+        if self.bar.close > self.profitPrice:
+            self.moveStopTime += 1
+            if self.moveStopTime < 4:
+                self.stopPrice = self.stopPrice + 4 * self.lastTAR
+            elif 10 > self.moveStopTime >= 4:
+                self.stopPrice = self.stopPrice + 2 * self.lastTAR
+            elif self.moveStopTime >= 10:
+                self.stopPrice = self.stopPrice + 1 * self.lastTAR
+            self.profitPrice = self.profitPrice + 4 * self.lastTAR
+        """
     #----------------------------------------------------------------------
     def onStopOrder(self, so):
         """停止单推送"""

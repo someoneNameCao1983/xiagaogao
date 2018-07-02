@@ -76,9 +76,9 @@ class EmaDemoStrategy(CtaTemplate):
         """初始化策略（必须由用户继承实现）"""
         self.writeCtaLog(u'双EMA演示策略初始化')
 
-        initData = self.loadBar(self.initDays)
-        for bar in initData:
-            self.onBar(bar)
+        #initData = self.loadBar(self.initDays)
+        #for bar in initData:
+        #    self.onBar(bar)
 
         self.putEvent()
         

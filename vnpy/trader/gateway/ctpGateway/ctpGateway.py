@@ -359,8 +359,8 @@ class CtpMdApi(MdApi):
         tick.bidVolume1 = data['BidVolume1']
         tick.askPrice1 = roundPrice(data['AskPrice1'])
         tick.askVolume1 = data['AskVolume1']
-        tickD = copy.deepcopy(tick)
-        saveEntityToMysql(tickD, 'tradeUrl')
+        #tickD = copy.deepcopy(tick)
+        #saveEntityToMysql(tickD, 'tradeUrl')
         self.gateway.onTick(tick)
         
     #---------------------------------------------------------------------- 
